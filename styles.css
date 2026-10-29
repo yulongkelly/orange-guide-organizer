@@ -1,0 +1,86 @@
+#ogo-launcher, #ogo-panel { all: initial; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
+#ogo-launcher { position: fixed; z-index: 2147483646; right: 20px; bottom: 22px; border: 0; border-radius: 999px; padding: 12px 18px; color: #fff; background: #8a5a48; box-shadow: 0 5px 22px #34231e44; font-size: 14px; font-weight: 700; cursor: pointer; }
+#ogo-panel { position: fixed; z-index: 2147483647; top: 0; right: 0; width: min(430px, 94vw); height: 100vh; display: flex; flex-direction: column; background: #fbf8f2; color: #302923; box-shadow: -8px 0 30px #2418112b; transform: translateX(110%); transition: transform .22s ease; font-size: 14px; }
+#ogo-panel.open { transform: translateX(0); }
+#ogo-panel * { box-sizing: border-box; }
+#ogo-panel header { display: flex; justify-content: space-between; align-items: center; padding: 19px 18px 15px; background: #f2e9dc; border-bottom: 1px solid #e6d9c9; }
+#ogo-panel header strong { display: block; font-size: 17px; }
+#ogo-panel header small { display: block; margin-top: 4px; color: #766b60; font-size: 11px; }
+#ogo-panel button { font: inherit; cursor: pointer; }
+#ogo-panel header button { border: 0; background: transparent; font-size: 25px; color: #66574b; }
+#ogo-panel.ogo-needs-consent > :not(header):not(.ogo-consent) { display: none !important; }
+#ogo-panel .ogo-consent[hidden] { display: none; }
+#ogo-panel .ogo-consent { display: block; margin: 18px; padding: 18px; border: 1px solid #e5d7c7; border-radius: 13px; background: #fffdf9; box-shadow: 0 8px 28px #24181118; }
+#ogo-panel .ogo-consent h2 { margin: 0 0 12px; color: #4e4035; font-size: 17px; }
+#ogo-panel .ogo-consent p { margin: 9px 0; color: #64594e; font-size: 13px; line-height: 1.65; }
+#ogo-panel .ogo-consent a { color: #8a5a48; }
+#ogo-panel .ogo-consent-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+#ogo-panel .ogo-consent-actions button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 8px 11px; color: #765541; background: #fff; }
+#ogo-panel .ogo-consent-actions button:last-child { border-color: #8a5a48; color: #fff; background: #8a5a48; }
+#ogo-panel .ogo-toolbar { display: flex; gap: 8px; padding: 13px 14px 8px; }
+#ogo-panel input { min-width: 0; flex: 1; padding: 9px 11px; border: 1px solid #ddd0c1; border-radius: 8px; background: #fff; font: inherit; }
+#ogo-panel select { max-width: 118px; padding: 8px 6px; border: 1px solid #ddd0c1; border-radius: 8px; background: #fff; color: #51483f; font: inherit; font-size: 11px; }
+#ogo-panel .ogo-flower-filter { display: flex; align-items: center; gap: 7px; padding: 2px 14px 10px; color: #76695e; font-size: 11px; }
+#ogo-panel .ogo-flower-filter input { width: 76px; flex: 0 0 76px; padding: 7px 8px; }
+#ogo-panel .ogo-flower-filter button { border: 0; padding: 5px 2px; color: #8a5a48; background: transparent; font-size: 11px; }
+#ogo-panel .ogo-toolbar button { border: 0; border-radius: 8px; padding: 0 11px; background: #8a5a48; color: white; font-size: 12px; }
+#ogo-panel nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 14px 10px; }
+#ogo-panel nav button { border: 1px solid #e2d5c5; border-radius: 99px; padding: 5px 9px; color: #695d51; background: #fff; font-size: 11px; }
+#ogo-panel nav button.active { color: #fff; background: #8a5a48; border-color: #8a5a48; }
+#ogo-panel .ogo-folder-nav { display: flex; gap: 6px; overflow-x: auto; padding: 1px 14px 9px; scrollbar-width: thin; }
+#ogo-panel .ogo-folder-nav[hidden] { display: none; }
+#ogo-panel .ogo-folder-nav button { flex: 0 0 auto; border: 1px solid #e2d5c5; border-radius: 99px; padding: 5px 9px; color: #695d51; background: #fff; font: inherit; font-size: 11px; cursor: pointer; }
+#ogo-panel .ogo-folder-nav button.active { border-color: #8a5a48; color: #fff; background: #8a5a48; }
+#ogo-panel .ogo-folder-nav small { margin-left: 2px; opacity: .8; }
+#ogo-panel .ogo-fav-tools { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 9px; }
+#ogo-panel .ogo-fav-tools[hidden], #ogo-panel .ogo-merge[hidden] { display: none; }
+#ogo-panel .ogo-fav-tools button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 7px 9px; color: #765541; background: #fff; font-size: 11px; }
+#ogo-panel .ogo-fav-tools button:disabled { opacity: .45; cursor: default; }
+#ogo-panel .ogo-fav-tools button[hidden] { display: none; }
+#ogo-panel .ogo-status { padding: 9px 16px; color: #786d61; background: #f6f0e7; font-size: 12px; line-height: 1.55; }
+#ogo-panel main { flex: 1; overflow: auto; padding: 11px 12px; }
+#ogo-panel .ogo-card { margin-bottom: 10px; padding: 12px; border: 1px solid #e9dfd3; border-radius: 10px; background: white; }
+#ogo-panel .ogo-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+#ogo-panel .ogo-badge { padding: 4px 8px; border-radius: 99px; color: #704739; background: #f5e8dd; font-size: 11px; }
+#ogo-panel .ogo-card-head button { border: 0; padding: 4px; color: #8a5a48; background: transparent; font-size: 11px; }
+#ogo-panel .ogo-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px; }
+#ogo-panel .ogo-card-head .ogo-fav { border: 1px solid #e8d8c7; border-radius: 99px; padding: 5px 8px; color: #805e47; background: #fffaf4; white-space: nowrap; }
+#ogo-panel .ogo-card-head .ogo-fav.saved { color: #a46a21; background: #fff2ce; border-color: #ead18f; }
+#ogo-panel .ogo-origin { color: #8a5a48; font-size: 11px; text-decoration: none; white-space: nowrap; }
+#ogo-panel .ogo-likes { color: #9d7045; font-size: 11px; white-space: nowrap; }
+#ogo-panel .ogo-select { display: inline-flex; align-items: center; gap: 3px; color: #77695e; font-size: 10px; white-space: nowrap; }
+#ogo-panel .ogo-select input { flex: none; margin: 0; accent-color: #8a5a48; }
+#ogo-panel .ogo-folder-dialog { position: absolute; z-index: 2; top: 28%; left: 18px; right: 18px; padding: 16px; border: 1px solid #e5d7c7; border-radius: 13px; background: #fffdf9; box-shadow: 0 8px 32px #24181135; }
+#ogo-panel .ogo-folder-dialog[hidden] { display: none; }
+#ogo-panel .ogo-folder-head { display: flex; justify-content: space-between; align-items: center; color: #4e4035; }
+#ogo-panel .ogo-folder-head button { border: 0; color: #78695c; background: transparent; font-size: 22px; }
+#ogo-panel .ogo-folder-dialog p { margin: 8px 0 12px; color: #84796e; font-size: 11px; line-height: 1.5; }
+#ogo-panel .ogo-folder-dialog input { width: 100%; min-height: 37px; }
+#ogo-panel .ogo-folder-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; }
+#ogo-panel .ogo-folder-actions button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 7px 10px; color: #765541; background: #fff; font-size: 12px; }
+#ogo-panel .ogo-timeline-node { position: relative; margin-left: 8px; padding: 0 0 9px 19px; border-left: 2px solid #ddc9b1; }
+#ogo-panel .ogo-timeline-node h3 { position: relative; margin: 3px 0 10px; color: #4e4035; font-size: 15px; }
+#ogo-panel .ogo-timeline-node h3 small { margin-left: 5px; color: #8c7d6f; font-size: 11px; font-weight: 400; }
+#ogo-panel .ogo-timeline-dot { position: absolute; left: -25px; top: 3px; width: 11px; height: 11px; border: 2px solid #fbf8f2; border-radius: 50%; background: #a66e50; box-shadow: 0 0 0 1px #c49b78; }
+#ogo-panel .ogo-timeline-items { padding-bottom: 4px; }
+#ogo-panel .ogo-work-group { margin: 0 0 9px; padding: 10px 11px; border: 1px solid #e9dfd3; border-radius: 10px; background: #fff; }
+#ogo-panel .ogo-work-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#ogo-panel .ogo-work-toggle { display: flex; flex: 1; min-width: 0; align-items: center; gap: 7px; border: 0; padding: 4px 0; color: #4e4035; background: transparent; text-align: left; cursor: pointer; }
+#ogo-panel .ogo-work-toggle > span:nth-child(2) { overflow: hidden; flex: 1; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+#ogo-panel .ogo-work-toggle small { color: #8c7d6f; font-size: 11px; font-weight: 400; white-space: nowrap; }
+#ogo-panel .ogo-work-chevron { display: inline-block; color: #9a7055; font-size: 20px; transition: transform .15s; }
+#ogo-panel .ogo-work-toggle[aria-expanded="true"] .ogo-work-chevron { transform: rotate(90deg); }
+#ogo-panel .ogo-work-content[hidden] { display: none; }
+#ogo-panel .ogo-work-link { color: #8a5a48; font-size: 11px; text-decoration: none; white-space: nowrap; }
+#ogo-panel .ogo-work-links { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; }
+#ogo-panel .ogo-work-links button { border: 1px solid #ddc9b1; border-radius: 7px; padding: 5px 8px; color: #765541; background: #fff; font-size: 11px; }
+#ogo-panel .ogo-import-dialog { position: absolute; z-index: 3; top: 28%; left: 18px; right: 18px; padding: 16px; border: 1px solid #e5d7c7; border-radius: 13px; background: #fffdf9; box-shadow: 0 8px 32px #24181135; }
+#ogo-panel .ogo-import-dialog[hidden] { display: none; }
+#ogo-panel .ogo-import-dialog p { margin: 12px 0; color: #64594e; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+#ogo-panel .ogo-import-dialog .ogo-folder-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#ogo-panel .ogo-import-dialog .ogo-folder-actions button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 7px 10px; color: #765541; background: #fff; font-size: 12px; }
+#ogo-panel .ogo-import-dialog .ogo-folder-actions button:disabled { opacity: .45; cursor: default; }
+#ogo-panel .ogo-card p { margin: 10px 0 1px; color: #3e3833; font-size: 13px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+#ogo-panel .ogo-empty { padding: 28px 15px; text-align: center; color: #8a7e72; line-height: 1.7; }
+#ogo-panel footer { padding: 10px 15px; border-top: 1px solid #e8ded2; color: #95897d; text-align: center; font-size: 11px; }
+.ogo-highlight { outline: 3px solid #e5a44f !important; outline-offset: 3px !important; transition: outline .2s ease; }
