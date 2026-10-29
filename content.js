@@ -216,12 +216,77 @@
     return found;
   };
 
+  const pageControlText = (el) => clean(el.getAttribute("aria-label") || el.getAttribute("title") || el.innerText || el.textContent);
+  const isVisible = (el) => Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
+  const getPagination = () => {
+    const roots = [...document.querySelectorAll('[class*="pagination" i],[class*="pager" i],[id*="pagination" i],[id*="pager" i],nav')]
+      .filter((el) => !panel.contains(el) && isVisible(el))
+      .map((el) => ({ el, numbers: [...el.querySelectorAll('a,button,[role="button"],li')].filter((item) => isVisible(item) && /^\d{1,5}$/.test(clean(item.innerText || item.textContent))) }))
+      .filter(({ numbers }) => numbers.length >= 2 && numbers.length <= 40)
+      .sort((a, b) => a.numbers.length - b.numbers.length);
+    const root = roots[0];
+    if (!root) return null;
+    const controls = [...root.el.querySelectorAll('a,button,[role="button"],li')].filter((el) => isVisible(el));
+    const numberOf = (el) => {
+      const label = clean(el.innerText || el.textContent);
+      return /^\d{1,5}$/.test(label) ? Number(label) : null;
+    };
+    const hasActiveMarker = (el) => {
+      let node = el;
+      while (node && root.el.contains(node)) {
+        if (node.matches('[aria-current="page"],[aria-selected="true"],.active,.current,.selected,[class~="on"]')) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+    const currentControl = root.numbers.find(hasActiveMarker);
+    const current = currentControl ? numberOf(currentControl) : null;
+    const numeric = new Map();
+    for (const el of controls) {
+      const number = numberOf(el);
+      if (number != null && !numeric.has(number)) numeric.set(number, el);
+    }
+    const isDisabled = (el) => {
+      let node = el;
+      while (node && root.el.contains(node)) {
+        if (node.matches(':disabled,[aria-disabled="true"],.disabled,[class~="disabled"]')) return true;
+        node = node.parentElement;
+      }
+      return false;
+    };
+    const arrow = (direction) => controls.find((el) => {
+      if (numberOf(el) != null || isDisabled(el)) return false;
+      const label = pageControlText(el).toLowerCase();
+      return direction === "next"
+        ? /^(?:下一页|下页|next|›|>|→|\u203a)$/.test(label)
+        : /^(?:上一页|上页|prev(?:ious)?|‹|<|←|\u2039)$/.test(label);
+    });
+    const total = Math.max(...root.numbers.map(numberOf));
+    return { root: root.el, current, total: Number.isFinite(total) ? total : null, numeric, next: (current == null ? null : numeric.get(current + 1)) || arrow("next"), previous: (current == null ? null : numeric.get(current - 1)) || arrow("previous") };
+  };
+
+  const waitForPage = async (pageNumber, previousUrl) => {
+    const deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const pagination = getPagination();
+      if (pagination?.current === pageNumber || (location.href !== previousUrl && pagination?.current != null)) return pagination;
+    }
+    return null;
+  };
+
+  const recordsOnCurrentPage = () => findComments().map(({ node, text, raw }, index) => {
+    const header = getHeader(raw, text);
+    return { node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(node, raw), flowers: getFlowerCount(node), key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle() };
+  });
+
   const panel = document.createElement("aside");
   panel.id = "ogo-panel";
   panel.innerHTML = `
     <header><div><strong>攻略整理器</strong><small>评论收藏保存在本机</small></div><button data-action="close" aria-label="关闭">×</button></header>
-    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不会上传评论、调用 AI 或读取登录凭据、Cookie。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
+    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不会上传评论、调用 AI 或读取登录凭据、Cookie。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
     <div class="ogo-toolbar"><input data-search placeholder="搜攻略内容 / 角色名"/><select data-sort aria-label="排序方式"><option value="page">页面顺序</option><option value="likes-desc">赞数从高到低</option><option value="likes-asc">赞数从低到高</option></select><button data-action="scan">重新扫描</button></div>
+    <div class="ogo-bulk-toolbar"><button data-action="scan-all-pages">抓取全部页</button><small data-bulk-status>自动逐页收集评论，可随时停止</small></div>
     <div class="ogo-flower-filter"><span>总花数</span><input type="number" min="0" data-flower-min placeholder="最低" aria-label="最低总花数"/><span>至</span><input type="number" min="0" data-flower-max placeholder="最高" aria-label="最高总花数"/><button data-action="clear-flower-filter">清除</button></div>
     <nav data-topics></nav><div class="ogo-folder-nav" data-folder-nav hidden></div><div class="ogo-fav-tools" data-fav-tools hidden><button data-action="select-all">全选当前列表</button><button data-action="folder-create" disabled>新建文件夹（0）</button><button data-action="folder-delete" hidden>删除文件夹</button><button data-action="export-selected" disabled>导出所选</button><button data-action="export-all">导出全部</button><button data-action="choose-import">导入 JSON</button><input data-import-file type="file" accept=".json,application/json" hidden></div><div class="ogo-status" data-status>正在扫描页面…</div><main data-results></main>
     <section class="ogo-folder-dialog" data-folder-dialog hidden><div class="ogo-folder-head"><strong>新建文件夹</strong><button data-action="close-folder">×</button></div><p>选中的收藏会放进文件夹，每条评论仍单独保留。</p><input data-folder-name placeholder="文件夹名称，例如：灵兽收集攻略"/><div class="ogo-folder-actions"><button data-action="close-folder">取消</button><button data-action="confirm-folder">创建</button></div></section>
@@ -248,6 +313,9 @@
   const selectedFavorites = new Set();
   let scanTimer;
   let consentGranted = false;
+  let bulkScanRunning = false;
+  let bulkStopRequested = false;
+  let bulkStatusMessage = "";
   const status = panel.querySelector("[data-status]");
   const consentScreen = panel.querySelector("[data-consent]");
   const results = panel.querySelector("[data-results]");
@@ -301,9 +369,12 @@
     createFolderButton.textContent = `新建文件夹（${selectedVisibleCount}）`;
     createFolderButton.disabled = selectedVisibleCount === 0;
     favoriteTools.querySelector('[data-action="export-selected"]').disabled = selectedVisibleCount === 0;
-    status.textContent = activeTopic === "收藏"
+    const bulkButton = panel.querySelector('[data-action="scan-all-pages"]');
+    bulkButton.textContent = bulkScanRunning ? "停止抓取" : "抓取全部页";
+    panel.querySelector("[data-bulk-status]").textContent = bulkScanRunning ? bulkStatusMessage : "自动逐页收集评论，可随时停止";
+    status.textContent = bulkScanRunning ? bulkStatusMessage : bulkStatusMessage || (activeTopic === "收藏"
       ? `${activeFolderId ? `文件夹：${folders[activeFolderId]?.name || "未命名"}` : "全部收藏"} · ${workGroups.size} 部作品 · ${items.length} 条评论`
-      : `找到 ${records.length} 条疑似攻略评论 · 当前显示 ${items.length} 条`;
+      : `找到 ${records.length} 条疑似攻略评论 · 当前显示 ${items.length} 条`);
     const renderCard = (r) => {
       const key = r.key || makeKey(r.text);
       const isSaved = Boolean(favorites[key]);
@@ -331,11 +402,9 @@
   }
 
   function scan() {
-    if (!consentGranted) return;
-    records = findComments().map(({ node, text, raw }, index) => {
-      const header = getHeader(raw, text);
-      return { node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(node, raw), flowers: getFlowerCount(node), key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle() };
-    });
+    if (!consentGranted || bulkScanRunning) return;
+    bulkStatusMessage = "";
+    records = recordsOnCurrentPage();
     let migratedTitle = false;
     for (const favorite of Object.values(favorites)) {
       if (!favorite.workTitle && favorite.url?.split("#")[0] === location.href.split("#")[0]) {
@@ -345,6 +414,88 @@
     }
     if (migratedTitle) saveFavorites();
     render();
+  }
+
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function scanAllPages() {
+    if (bulkScanRunning) { bulkStopRequested = true; bulkStatusMessage = "正在停止…"; render(); return; }
+    if (!consentGranted) return;
+    const initialPager = getPagination();
+    if (!initialPager?.current) {
+      bulkStatusMessage = "没识别到评论分页。请先展开评论区，确认页码分页已显示后重试。";
+      render();
+      return;
+    }
+    bulkScanRunning = true;
+    bulkStopRequested = false;
+    bulkStatusMessage = "准备从第 1 页开始…";
+    render();
+    const collected = new Map();
+    let pagesRead = 0;
+    let current = getPagination()?.current;
+    const startingPage = current;
+    try {
+      // Start at page 1 even if the user launched the organizer from a later page.
+      while (current > 1 && !bulkStopRequested) {
+        const pager = getPagination();
+        if (!pager?.previous) throw new Error(`无法从第 ${current} 页返回上一页。`);
+        const oldUrl = location.href;
+        pager.previous.click();
+        const moved = await waitForPage(current - 1, oldUrl);
+        if (!moved) throw new Error("翻页后未检测到页码变化；该作品的分页可能不是页面内切换。请手动切到第 1 页后重试。");
+        current = moved.current;
+        await pause(500);
+      }
+      while (!bulkStopRequested) {
+        const pager = getPagination();
+        current = pager?.current ?? current;
+        if (current == null) throw new Error("无法识别当前评论页码，已停止抓取。");
+        for (const record of recordsOnCurrentPage()) {
+          const identity = `${record.author}|${record.flowerLine}|${record.postedAt}|${clean(record.text)}`;
+          if (!collected.has(identity)) collected.set(identity, record);
+        }
+        pagesRead++;
+        bulkStatusMessage = `抓取中：第 ${current} 页${pager?.total ? ` / ${pager.total}` : ""}，已收集 ${collected.size} 条攻略评论`;
+        render();
+        if (!pager?.next) break;
+        const oldUrl = location.href;
+        const nextPage = current + 1;
+        pager.next.click();
+        const moved = await waitForPage(nextPage, oldUrl);
+        if (!moved) {
+          // Some pagers keep the final page button visible but disable the next arrow.
+          const refreshed = getPagination();
+          if (!refreshed?.next || refreshed.current === current) break;
+          throw new Error("翻页没有成功，已保留目前已抓取的评论。");
+        }
+        await pause(650);
+      }
+      if (!bulkStopRequested && current !== startingPage) {
+        bulkStatusMessage = `已读取 ${pagesRead} 页，正在返回原来的第 ${startingPage} 页…`;
+        render();
+        while (current > startingPage) {
+          const pager = getPagination();
+          if (!pager?.previous) break;
+          const oldUrl = location.href;
+          pager.previous.click();
+          const moved = await waitForPage(current - 1, oldUrl);
+          if (!moved) break;
+          current = moved.current;
+          await pause(300);
+        }
+      }
+      records = [...collected.values()].map((record, index) => ({ ...record, index }));
+      bulkStatusMessage = bulkStopRequested
+        ? `已停止：读取 ${pagesRead} 页，收集到 ${records.length} 条攻略评论。`
+        : `全部抓取完成：读取 ${pagesRead} 页，去重后共 ${records.length} 条攻略评论。`;
+    } catch (error) {
+      records = [...collected.values()].map((record, index) => ({ ...record, index }));
+      bulkStatusMessage = `${error.message} 已读取 ${pagesRead} 页，保留 ${records.length} 条评论。`;
+    } finally {
+      bulkScanRunning = false;
+      bulkStopRequested = false;
+      render();
+    }
   }
 
   launcher.addEventListener("click", () => panel.classList.toggle("open"));
@@ -361,6 +512,7 @@
     }
     if (event.target.closest('[data-action="decline-consent"]')) panel.classList.remove("open");
     if (event.target.closest('[data-action="scan"]')) scan();
+    if (event.target.closest('[data-action="scan-all-pages"]')) await scanAllPages();
     const topicButton = event.target.closest("[data-topic]");
     if (topicButton) {
       activeTopic = topicButton.dataset.topic;

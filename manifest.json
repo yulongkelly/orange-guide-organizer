@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "橙光攻略整理器",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "在橙光作品页整理、收藏、导入和导出攻略评论。",
   "permissions": ["storage"],
   "content_scripts": [
