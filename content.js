@@ -316,6 +316,8 @@
   let bulkScanRunning = false;
   let bulkStopRequested = false;
   let bulkStatusMessage = "";
+  let activeBulkCollected = null;
+  let ignorePaginationMutationsUntil = 0;
   const status = panel.querySelector("[data-status]");
   const consentScreen = panel.querySelector("[data-consent]");
   const results = panel.querySelector("[data-results]");
@@ -402,7 +404,7 @@
   }
 
   function scan() {
-    if (!consentGranted || bulkScanRunning) return;
+    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) return;
     bulkStatusMessage = "";
     records = recordsOnCurrentPage();
     let migratedTitle = false;
@@ -417,8 +419,17 @@
   }
 
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const showCollectedBulkRecords = (collected) => {
+    records = [...collected.values()].map((record, index) => ({ ...record, index }));
+  };
   async function scanAllPages() {
-    if (bulkScanRunning) { bulkStopRequested = true; bulkStatusMessage = "正在停止…"; render(); return; }
+    if (bulkScanRunning) {
+      bulkStopRequested = true;
+      if (activeBulkCollected) showCollectedBulkRecords(activeBulkCollected);
+      bulkStatusMessage = `正在停止…已收集 ${records.length} 条攻略评论`;
+      render();
+      return;
+    }
     if (!consentGranted) return;
     const initialPager = getPagination();
     if (!initialPager?.current) {
@@ -428,9 +439,11 @@
     }
     bulkScanRunning = true;
     bulkStopRequested = false;
+    clearTimeout(scanTimer);
+    activeBulkCollected = new Map();
     bulkStatusMessage = "准备从第 1 页开始…";
     render();
-    const collected = new Map();
+    const collected = activeBulkCollected;
     let pagesRead = 0;
     let current = getPagination()?.current;
     const startingPage = current;
@@ -454,6 +467,7 @@
           const identity = `${record.author}|${record.flowerLine}|${record.postedAt}|${clean(record.text)}`;
           if (!collected.has(identity)) collected.set(identity, record);
         }
+        showCollectedBulkRecords(collected);
         pagesRead++;
         bulkStatusMessage = `抓取中：第 ${current} 页${pager?.total ? ` / ${pager.total}` : ""}，已收集 ${collected.size} 条攻略评论`;
         render();
@@ -484,16 +498,20 @@
           await pause(300);
         }
       }
-      records = [...collected.values()].map((record, index) => ({ ...record, index }));
+      showCollectedBulkRecords(collected);
       bulkStatusMessage = bulkStopRequested
         ? `已停止：读取 ${pagesRead} 页，收集到 ${records.length} 条攻略评论。`
         : `全部抓取完成：读取 ${pagesRead} 页，去重后共 ${records.length} 条攻略评论。`;
     } catch (error) {
-      records = [...collected.values()].map((record, index) => ({ ...record, index }));
+      showCollectedBulkRecords(collected);
       bulkStatusMessage = `${error.message} 已读取 ${pagesRead} 页，保留 ${records.length} 条评论。`;
     } finally {
+      showCollectedBulkRecords(collected);
       bulkScanRunning = false;
       bulkStopRequested = false;
+      activeBulkCollected = null;
+      clearTimeout(scanTimer);
+      ignorePaginationMutationsUntil = Date.now() + 1800;
       render();
     }
   }
@@ -670,7 +688,11 @@
       render();
     }
   });
-  new MutationObserver(() => { if (!consentGranted) return; clearTimeout(scanTimer); scanTimer = setTimeout(scan, 700); }).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(() => {
+    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scan, 700);
+  }).observe(document.body, { childList: true, subtree: true });
   loadFavorites().then(() => chrome.storage.local.get({ ogoDataConsentV1: false }, (data) => {
     consentGranted = data.ogoDataConsentV1 === true;
     if (consentGranted) scan();
