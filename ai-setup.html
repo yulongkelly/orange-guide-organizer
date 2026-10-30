@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>开启 AI 攻略整理</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;padding:36px 20px;background:#faf7f1;color:#42382f;font:16px/1.65 system-ui,-apple-system,"Microsoft YaHei",sans-serif}.wrap{max-width:760px;margin:0 auto}h1{margin:0 0 8px;font-size:28px} .lead{margin:0 0 26px;color:#716458}.steps{display:grid;gap:14px}.step{display:grid;grid-template-columns:38px 1fr;gap:12px;padding:17px;border:1px solid #e8ddcf;border-radius:12px;background:#fff}.number{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#805c49;color:#fff;font-weight:700}.step h2{margin:0 0 5px;font-size:17px}.step p{margin:0;color:#6f6257}.button{display:inline-block;margin-top:10px;padding:9px 14px;border:0;border-radius:8px;background:#805c49;color:white;text-decoration:none;font:inherit;font-size:14px;cursor:pointer}.button.secondary{border:1px solid #ddc9b1;background:#fff;color:#765541}.note{margin-top:18px;padding:13px 15px;border-radius:10px;background:#f1e9de;color:#6f6257;font-size:13px}#connect{width:100%;margin-top:19px;padding:13px 16px;border:0;border-radius:9px;background:#805c49;color:white;font:inherit;font-weight:650;cursor:pointer}#connect:disabled{opacity:.55;cursor:wait}#status{min-height:28px;margin-top:12px;white-space:pre-wrap;color:#6d543f}a{color:#805c49}@media(max-width:520px){body{padding:24px 14px}h1{font-size:24px}.step{padding:14px}}
+  </style>
+</head>
+<body><main class="wrap">
+  <h1>开启 AI 攻略整理</h1>
+  <p class="lead">只需要设置一次。跟着下面三步做，不需要输入代码。</p>
+  <section class="steps">
+    <article class="step"><span class="number">1</span><div><h2>安装 Ollama</h2><p>点按钮打开 Ollama 官方下载页，下载后双击安装文件。安装过程中如果 Windows 弹出提示，按“是”或“允许”。</p><a class="button" href="https://ollama.com/download/windows" target="_blank" rel="noreferrer">下载并安装 Ollama</a></div></article>
+    <article class="step"><span class="number">2</span><div><h2>打开 Ollama</h2><p>安装后点下面的按钮。如果 Chrome 询问是否打开 Ollama，请选择“打开”。保持 Ollama 打开即可。扩展连接后会提供一键下载模型按钮（约 2.5 GB）。如果按钮没有反应，也可以从 Windows“开始”菜单打开 Ollama。</p><a class="button" href="ollama://">打开 Ollama</a></div></article>
+    <article class="step"><span class="number">3</span><div><h2>连接攻略整理器</h2><p>点下方按钮连接 Ollama。Chrome 弹出权限提示时，选择“允许”。然后回到橙光作品页，点击“一键下载模型”；完成后再点“AI 去重整理”。评论只会交给这台电脑上的 Ollama 处理。</p></div></article>
+  </section>
+  <button id="connect">下一步：连接 Ollama</button>
+  <div id="status" role="status" aria-live="polite"></div>
+  <p class="note">如果你现在不想安装 Ollama，直接关闭这个页面即可。攻略整理器原来的搜索、收藏和导出功能仍可使用；AI 整理可以之后再开启。</p>
+</main><script src="ai-setup.js"></script></body></html>

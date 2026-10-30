@@ -284,13 +284,14 @@
   panel.id = "ogo-panel";
   panel.innerHTML = `
     <header><div><strong>攻略整理器</strong><small>评论收藏保存在本机</small></div><button data-action="close" aria-label="关闭">×</button></header>
-    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不会上传评论、调用 AI 或读取登录凭据、Cookie。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
+    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不向开发者或云端上传评论，也不读取登录凭据或 Cookie。可选的“AI 去重整理”仅在你主动点击并同意后，把评论正文和临时编号发送给你电脑上的 Ollama；作者、赞数和来源链接留在扩展中。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
     <div class="ogo-toolbar"><input data-search placeholder="搜攻略内容 / 角色名"/><select data-sort aria-label="排序方式"><option value="page">页面顺序</option><option value="likes-desc">赞数从高到低</option><option value="likes-asc">赞数从低到高</option></select><button data-action="scan">重新扫描</button></div>
     <div class="ogo-bulk-toolbar"><button data-action="scan-all-pages">抓取全部页</button><small data-bulk-status>自动逐页收集评论，可随时停止</small></div>
+    <div class="ogo-ai-toolbar"><div><button data-action="ai-select-all">全选</button><button data-action="ai-select-none">清空选择</button><button class="ogo-ai-primary" data-action="ai-dedupe">AI 去重整理（0）</button><button data-action="ai-install-model" hidden>一键下载模型（约 2.5 GB）</button></div><small data-ai-status>仅使用本机 Ollama；评论不会发送到云端</small></div>
     <div class="ogo-flower-filter"><span>总花数</span><input type="number" min="0" data-flower-min placeholder="最低" aria-label="最低总花数"/><span>至</span><input type="number" min="0" data-flower-max placeholder="最高" aria-label="最高总花数"/><button data-action="clear-flower-filter">清除</button></div>
     <nav data-topics></nav><div class="ogo-folder-nav" data-folder-nav hidden></div><div class="ogo-fav-tools" data-fav-tools hidden><button data-action="select-all">全选当前列表</button><button data-action="folder-create" disabled>新建文件夹（0）</button><button data-action="folder-delete" hidden>删除文件夹</button><button data-action="export-selected" disabled>导出所选</button><button data-action="export-all">导出全部</button><button data-action="choose-import">导入 JSON</button><input data-import-file type="file" accept=".json,application/json" hidden></div><div class="ogo-status" data-status>正在扫描页面…</div><main data-results></main>
     <section class="ogo-folder-dialog" data-folder-dialog hidden><div class="ogo-folder-head"><strong>新建文件夹</strong><button data-action="close-folder">×</button></div><p>选中的收藏会放进文件夹，每条评论仍单独保留。</p><input data-folder-name placeholder="文件夹名称，例如：灵兽收集攻略"/><div class="ogo-folder-actions"><button data-action="close-folder">取消</button><button data-action="confirm-folder">创建</button></div></section>
-    <section class="ogo-import-dialog" data-import-dialog hidden><div class="ogo-folder-head"><strong>导入收藏备份</strong><button data-action="close-import">×</button></div><p data-import-summary></p><div class="ogo-folder-actions"><button data-action="close-import">取消</button><button data-action="confirm-import" disabled>合并导入</button></div></section>`;
+    <section class="ogo-import-dialog" data-import-dialog hidden><div class="ogo-folder-head"><strong>导入收藏备份</strong><button data-action="close-import">×</button></div><p data-import-summary></p><div class="ogo-folder-actions"><button data-action="close-import">取消</button><button data-action="confirm-import" disabled>合并导入</button></div></section><section class="ogo-ai-consent" data-ai-consent role="dialog" aria-modal="true" hidden><h2>启用本机 AI 去重</h2><p>整理时，所选评论正文和临时编号会发送给运行在你电脑上的 Ollama（默认模型 qwen3:4b）。作者、赞数、作品和来源链接不会发送。内容不会发往云端模型，也不会保存整理结果。</p><p>继续即表示同意此项本机处理。扩展还会请求访问 localhost，以连接 Ollama。</p><div class="ogo-folder-actions"><button data-action="cancel-ai-consent">取消</button><button data-action="accept-ai-consent">同意并继续</button></div></section><section class="ogo-ai-results" data-ai-results hidden></section>`;
   document.documentElement.append(panel);
   const launcher = document.createElement("button");
   launcher.id = "ogo-launcher";
@@ -311,6 +312,14 @@
   let pendingImport = null;
   const expandedWorks = new Set();
   const selectedFavorites = new Set();
+  const selectedAiRecords = new Set();
+  let aiRunning = false;
+  let aiCancelled = false;
+  let aiResult = null;
+  let aiModelMissing = false;
+  let aiDownloadRunning = false;
+  let aiDownloadPort = null;
+  let aiStatusMessage = "";
   let scanTimer;
   let consentGranted = false;
   let bulkScanRunning = false;
@@ -327,11 +336,23 @@
   const folderDialog = panel.querySelector("[data-folder-dialog]");
   const importDialog = panel.querySelector("[data-import-dialog]");
   const importFileInput = panel.querySelector("[data-import-file]");
+  const aiConsentScreen = panel.querySelector("[data-ai-consent]");
   const loadFavorites = () => new Promise((resolve) => chrome.storage.local.get({ ogoFavorites: {}, ogoFolders: {} }, (data) => { favorites = data.ogoFavorites || {}; folders = data.ogoFolders || {}; resolve(); }));
   const saveFavorites = () => new Promise((resolve) => chrome.storage.local.set({ ogoFavorites: favorites }, resolve));
   const saveFolders = () => new Promise((resolve) => chrome.storage.local.set({ ogoFolders: folders }, resolve));
 
+  const aiKey = (r) => `${r.key || makeKey(r.text)}|${r.author || ""}|${r.postedAt || ""}|${r.flowerLine || ""}`;
   function render() {
+    const aiToolbar = panel.querySelector(".ogo-ai-toolbar");
+    aiToolbar.hidden = activeTopic === "收藏" || Boolean(aiResult);
+    const selectedAiCount = records.filter((r) => selectedAiRecords.has(aiKey(r))).length;
+    const aiButton = aiToolbar.querySelector("[data-action=ai-dedupe]");
+    aiButton.textContent = aiRunning ? "取消整理" : `AI 去重整理（${selectedAiCount}）`;
+    aiButton.disabled = !aiRunning && selectedAiCount < 2;
+    const installModelButton = aiToolbar.querySelector("[data-action=ai-install-model]");
+    installModelButton.hidden = !aiModelMissing;
+    installModelButton.textContent = aiDownloadRunning ? "取消下载" : "一键下载模型（约 2.5 GB）";
+    aiToolbar.querySelector("[data-ai-status]").textContent = aiRunning ? panel.dataset.aiProgress || "正在整理…" : aiDownloadRunning ? panel.dataset.aiProgress || "正在准备下载…" : aiStatusMessage || "仅使用本机 Ollama；评论不会发送到云端";
     const topicsFound = ["全部", ...new Set(records.map((r) => r.topic)), "收藏"];
     topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : ""}</button>`).join("");
     folderNav.hidden = activeTopic !== "收藏";
@@ -385,10 +406,12 @@
         : `<a class="ogo-origin" href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">打开作品页 ↗</a>`;
       const likeLabel = r.likes == null ? "赞数未知" : `赞 ${r.likes}`;
       const flowerLabel = r.flowers == null ? "花数未知" : `🌸 ${r.flowers}`;
+      const aiSelect = activeTopic !== "收藏" ? `<label class="ogo-ai-select" title="选择用于 AI 去重"><input type="checkbox" data-ai-select="${escapeHtml(aiKey(r))}" ${selectedAiRecords.has(aiKey(r)) ? "checked" : ""}/>AI</label>` : "";
       const selectFavorite = r.saved && activeTopic === "收藏" ? `<label class="ogo-select"><input type="checkbox" data-select-fav="${escapeHtml(key)}" ${selectedFavorites.has(key) ? "checked" : ""}/>选入文件夹</label>` : "";
       const exportOneButton = isSaved ? `<button data-export-favorite="${escapeHtml(key)}">导出</button>` : "";
-      return `<article class="ogo-card"><div class="ogo-card-head"><span class="ogo-badge">${escapeHtml(r.topic || "已收藏")}</span><div class="ogo-actions">${selectFavorite}<span class="ogo-likes">${likeLabel} · ${flowerLabel}</span>${exportOneButton}${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(r.text)}</p></article>`;
+      return `<article class="ogo-card"><div class="ogo-card-head"><span class="ogo-badge">${escapeHtml(r.topic || "已收藏")}</span><div class="ogo-actions">${aiSelect}${selectFavorite}<span class="ogo-likes">${likeLabel} · ${flowerLabel}</span>${exportOneButton}${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(r.text)}</p></article>`;
     };
+    if (aiResult) { renderAiResults(); return; }
     if (workGroups) {
       results.innerHTML = [...workGroups.entries()].sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([title, entries]) => {
         const url = entries[0]?.url || "";
@@ -403,10 +426,170 @@
     if (!items.length) results.innerHTML = `<div class="ogo-empty">${activeTopic === "收藏" ? (activeFolderId ? "这个文件夹还没有评论。" : "还没有收藏。看到喜欢的攻略评论，点它旁边的“☆ 收藏”即可。") : records.length ? "没有符合搜索条件的评论。" : "还没找到攻略评论。先展开“全部互动”，再滚动加载评论后点重新扫描。"}</div>`;
   }
 
+  function renderAiResults() {
+    const topicGroups = new Map();
+    for (const group of aiResult || []) {
+      const topic = group[0]?.topic || "其他攻略";
+      if (!topicGroups.has(topic)) topicGroups.set(topic, []);
+      topicGroups.get(topic).push(group);
+    }
+    const total = (aiResult || []).reduce((sum, group) => sum + group.length, 0);
+    const merged = (aiResult || []).filter((group) => group.length > 1);
+    const mergedComments = merged.reduce((sum, group) => sum + group.length, 0);
+    const duplicateCount = merged.reduce((sum, group) => sum + group.length - 1, 0);
+    const keptSeparate = total - mergedComments;
+    results.innerHTML = `<div class="ogo-ai-result-head"><strong>AI 去重整理结果</strong><button data-action="ai-close-result">返回攻略</button></div><p class="ogo-ai-result-note">共检查 ${total} 条：合并 ${merged.length} 组重复内容，减少 ${duplicateCount} 条重复；${keptSeparate} 条没有发现重复，分别保留。不同主题、阶段、路线、条件和数值不会强行合并。</p><details class="ogo-ai-process"><summary>查看整理过程与判断依据</summary><ol><li>检查你勾选的 ${total} 条评论，只把正文发给本机 Ollama 分析。</li><li>按作品页面已有主题显示结果；不让模型改写攻略正文。</li><li>只有实质相同的建议才合并，并保留所有作者和来源；赞数较高的原文作为展示内容。</li><li>阶段、条件、路线、对象或数值不同，或无法确定是否重复时，单独保留。</li></ol>${merged.length ? `<p>识别到 ${merged.length} 组重复内容：</p>` : `<p>这次没有找到足够确定的重复建议，因此没有合并。内容相似但攻略路线或适用条件不同的条目会分别保留。</p>`}</details><button data-action="ai-copy-result">复制整理结果</button>${[...topicGroups.entries()].map(([topic, groups]) => `<section class="ogo-ai-topic"><h3>${escapeHtml(topic)}</h3>${groups.map((group) => {
+      const representative = [...group].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1) || a.index - b.index)[0];
+      const authors = [...new Set(group.map((r) => r.author || "作者未知"))];
+      const sources = group.map((r) => `<a href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">${escapeHtml(r.author || "作者未知")} · ${r.likes == null ? "赞数未知" : `赞 ${r.likes}`} · ${escapeHtml(r.postedAt || "原评论")}</a>`).join("");
+      return `<article class="ogo-ai-item"><small>合并 ${group.length} 条 · 作者：${authors.map(escapeHtml).join("、")}</small><p>${escapeHtml(representative.text)}</p><details><summary>查看 ${group.length} 个来源</summary>${sources}</details></article>`;
+    }).join("")}</section>`).join("")}`;
+  }
+
+  const aiMarkdown = () => {
+    const lines = ["# AI 去重整理攻略", ""];
+    const topics = new Map();
+    for (const group of aiResult || []) {
+      const topic = group[0]?.topic || "其他攻略";
+      if (!topics.has(topic)) topics.set(topic, []);
+      topics.get(topic).push(group);
+    }
+    for (const [topic, groups] of topics) {
+      lines.push(`## ${topic}`, "");
+      for (const group of groups) {
+        const rep = [...group].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1) || a.index - b.index)[0];
+        lines.push(rep.text, "", `作者：${[...new Set(group.map((r) => r.author || "作者未知"))].join("、")}`);
+        lines.push(...group.map((r) => `来源：${r.url || location.href}（${r.author || "作者未知"}${r.likes == null ? "" : `，赞 ${r.likes}`}）`), "");
+      }
+    }
+    return lines.join("\n");
+  };
+
+  async function beginAiDedupe() {
+    const chosen = records.filter((r) => selectedAiRecords.has(aiKey(r)));
+    if (chosen.length < 2) return;
+    aiRunning = true; aiCancelled = false; aiResult = null;
+    const requestId = `ogo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    panel.dataset.aiRequestId = requestId;
+    panel.dataset.aiProgress = `检查 Ollama… 已选择 ${chosen.length} 条`;
+    render();
+    const call = (message) => new Promise((resolve, reject) => chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(response);
+    }));
+    try {
+      const consent = await new Promise((resolve) => chrome.storage.local.get({ ogoLocalAiConsentV1: false }, (data) => resolve(data.ogoLocalAiConsentV1)));
+      if (aiCancelled) return;
+      if (!consent) {
+        aiRunning = false;
+        aiConsentScreen.hidden = false;
+        panel.dataset.aiPending = "1";
+        render();
+        return;
+      }
+      const authorized = await call({ type: "ogo-ai-authorize" });
+      if (aiCancelled) return;
+      if (!authorized?.ok && authorized?.code === "permission") {
+        aiRunning = false;
+        await call({ type: "ogo-ai-open-setup" });
+        panel.dataset.aiProgress = "请在新打开的设置页连接 Ollama；连接成功后回到这里重新点击整理。";
+        render();
+        panel.querySelector("[data-ai-status]").textContent = "请在新打开的本机 AI 设置页完成授权。";
+        return;
+      }
+      if (!authorized?.ok && authorized?.code === "model") {
+        aiRunning = false; aiModelMissing = true; aiStatusMessage = authorized.message; render(); return;
+      }
+      if (!authorized?.ok) throw new Error(authorized?.message || "无法连接本机 Ollama。");
+      aiModelMissing = false; aiStatusMessage = "";
+      const idToRecord = new Map();
+      const payload = chosen.map((record, index) => {
+        const id = String(index + 1); idToRecord.set(id, record);
+        return { id, text: record.text };
+      });
+      panel.dataset.aiProgress = `正在本机逐条比较 ${chosen.length} 条评论；阶段、路线和条件不同的会分开保留…`;
+      render();
+      const response = await call({ type: "ogo-ai-dedupe", requestId, items: payload });
+      if (aiCancelled) return;
+      if (!response?.ok) {
+        if (response?.code === "cancelled") return;
+        throw new Error(response?.message || "模型未能完成整理。");
+      }
+      const groups = [];
+      for (const ids of response.groups) {
+        const bucket = new Map();
+        for (const id of ids) {
+          const record = idToRecord.get(id);
+          if (!record) throw new Error("模型结果引用了未知评论");
+          const safeKey = `${record.topic}|${JSON.stringify((record.text.match(/\d+(?:\.\d+)?(?:万|亿|点|级|年|月|天|次|个|岁|%|％)?/g) || []).sort())}|${JSON.stringify((record.text.match(/(?:练气|筑基|金丹|元婴|化神|炼虚|合体|大乘|渡劫)(?:期|境)?/g) || []).sort())}|${JSON.stringify((record.text.match(/(?:如果|若是|若|当|达到|需要|必须|仅限|至少|最多|超过|之前|之后|未满|除非).{0,16}/g) || []).sort())}`;
+          if (!bucket.has(safeKey)) bucket.set(safeKey, []);
+          bucket.get(safeKey).push(record);
+        }
+        groups.push(...bucket.values());
+      }
+      aiResult = groups;
+      aiRunning = false;
+      panel.dataset.aiProgress = "";
+      render();
+    } catch (error) {
+      aiRunning = false;
+      panel.dataset.aiProgress = "";
+      aiStatusMessage = error.message || "本机模型未能完成整理。";
+      render();
+    }
+  }
+
+  function startAiModelInstall() {
+    if (aiDownloadRunning) {
+      aiDownloadPort?.postMessage({ action: "cancel" });
+      aiDownloadRunning = false;
+      panel.dataset.aiProgress = "正在取消下载…";
+      render();
+      return;
+    }
+    aiDownloadRunning = true;
+    aiStatusMessage = "";
+    panel.dataset.aiProgress = "正在通过 Ollama 安全连接下载…";
+    render();
+    const port = chrome.runtime.connect({ name: "ogo-ai-install-model" });
+    aiDownloadPort = port;
+    port.onMessage.addListener((message) => {
+      if (message.type === "progress") {
+        const percent = message.percent == null ? "" : ` ${message.percent}%`;
+        panel.dataset.aiProgress = `${message.status}${percent}；请保持 Ollama 打开`;
+        render();
+      } else if (message.type === "done") {
+        aiDownloadRunning = false;
+        aiDownloadPort = null;
+        panel.dataset.aiProgress = "";
+        if (message.ok) {
+          aiModelMissing = false;
+          aiStatusMessage = "模型下载完成。现在点击 AI 去重整理即可开始。";
+        } else if (message.cancelled) {
+          aiStatusMessage = "下载已取消。需要时可以再次点击下载。";
+        } else {
+          aiStatusMessage = `模型下载失败：${message.error || "请确认 Ollama 已打开后重试。"}`;
+        }
+        render();
+      }
+    });
+    port.onDisconnect.addListener(() => {
+      if (aiDownloadRunning) {
+        aiDownloadRunning = false; aiDownloadPort = null;
+        aiStatusMessage = "下载连接中断。请确认 Ollama 已打开后重试。";
+        render();
+      }
+    });
+    port.postMessage({ action: "pull" });
+  }
+
   function scan() {
-    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) return;
+    if (!consentGranted || bulkScanRunning || aiRunning || aiResult || Date.now() < ignorePaginationMutationsUntil) return;
     bulkStatusMessage = "";
     records = recordsOnCurrentPage();
+    selectedAiRecords.clear();
+    for (const record of records) selectedAiRecords.add(aiKey(record));
+    aiResult = null;
     let migratedTitle = false;
     for (const favorite of Object.values(favorites)) {
       if (!favorite.workTitle && favorite.url?.split("#")[0] === location.href.split("#")[0]) {
@@ -421,6 +604,7 @@
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const showCollectedBulkRecords = (collected) => {
     records = [...collected.values()].map((record, index) => ({ ...record, index }));
+    for (const record of records) if (!selectedAiRecords.has(aiKey(record))) selectedAiRecords.add(aiKey(record));
   };
   async function scanAllPages() {
     if (bulkScanRunning) {
@@ -517,7 +701,27 @@
   }
 
   launcher.addEventListener("click", () => panel.classList.toggle("open"));
+  panel.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-ai-select]");
+    if (checkbox) { if (checkbox.checked) selectedAiRecords.add(checkbox.dataset.aiSelect); else selectedAiRecords.delete(checkbox.dataset.aiSelect); render(); }
+  });
   panel.addEventListener("click", async (event) => {
+    if (event.target.closest('[data-action="ai-install-model"]')) startAiModelInstall();
+    if (event.target.closest('[data-action="ai-select-all"]')) { for (const r of records) selectedAiRecords.add(aiKey(r)); render(); }
+    if (event.target.closest('[data-action="ai-select-none"]')) { selectedAiRecords.clear(); render(); }
+    if (event.target.closest('[data-action="ai-dedupe"]')) {
+      if (aiRunning) { aiCancelled = true; chrome.runtime.sendMessage({ type: "ogo-ai-cancel", requestId: panel.dataset.aiRequestId }); aiRunning = false; panel.dataset.aiProgress = "已取消整理；已抓取攻略仍保留"; render(); }
+      else beginAiDedupe();
+    }
+    if (event.target.closest('[data-action="accept-ai-consent"]')) {
+      chrome.storage.local.set({ ogoLocalAiConsentV1: true }, () => { aiConsentScreen.hidden = true; panel.dataset.aiPending = ""; beginAiDedupe(); });
+    }
+    if (event.target.closest('[data-action="cancel-ai-consent"]')) { aiConsentScreen.hidden = true; panel.dataset.aiPending = ""; render(); }
+    if (event.target.closest('[data-action="ai-close-result"]')) { aiResult = null; render(); }
+    if (event.target.closest('[data-action="ai-copy-result"]')) {
+      try { await navigator.clipboard.writeText(aiMarkdown()); panel.querySelector("[data-ai-status]").textContent = "已复制整理结果。"; }
+      catch { panel.querySelector("[data-ai-status]").textContent = "复制失败；请检查浏览器剪贴板权限。"; }
+    }
     const close = event.target.closest('[data-action="close"]');
     if (close) panel.classList.remove("open");
     if (event.target.closest('[data-action="accept-consent"]')) {
@@ -689,7 +893,7 @@
     }
   });
   new MutationObserver(() => {
-    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
+    if (!consentGranted || bulkScanRunning || aiRunning || aiResult || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scan, 700);
   }).observe(document.body, { childList: true, subtree: true });

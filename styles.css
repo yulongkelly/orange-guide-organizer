@@ -87,3 +87,32 @@
 #ogo-panel .ogo-empty { padding: 28px 15px; text-align: center; color: #8a7e72; line-height: 1.7; }
 #ogo-panel footer { padding: 10px 15px; border-top: 1px solid #e8ded2; color: #95897d; text-align: center; font-size: 11px; }
 .ogo-highlight { outline: 3px solid #e5a44f !important; outline-offset: 3px !important; transition: outline .2s ease; }
+#ogo-panel .ogo-ai-toolbar { padding: 8px 12px; border-bottom: 1px solid #eee3d7; background: #fffaf4; }
+#ogo-panel .ogo-ai-toolbar[hidden] { display: none; }
+#ogo-panel .ogo-ai-toolbar > div { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+#ogo-panel .ogo-ai-toolbar button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 6px 9px; color: #765541; background: #fff; font-size: 12px; }
+#ogo-panel .ogo-ai-toolbar .ogo-ai-primary { color: #fff; background: #805c49; border-color: #805c49; }
+#ogo-panel .ogo-ai-toolbar button:disabled { opacity: .48; }
+#ogo-panel .ogo-ai-toolbar small { display: block; margin-top: 5px; color: #8b7b6d; font-size: 10px; line-height: 1.4; }
+#ogo-panel .ogo-ai-select { display: inline-flex; align-items: center; gap: 3px; color: #77695e; font-size: 10px; white-space: nowrap; }
+#ogo-panel .ogo-ai-select input { flex: none; margin: 0; accent-color: #805c49; }
+#ogo-panel .ogo-ai-consent { position: absolute; z-index: 4; top: 25%; left: 18px; right: 18px; padding: 17px; border: 1px solid #e5d7c7; border-radius: 13px; background: #fffdf9; box-shadow: 0 8px 32px #24181135; }
+#ogo-panel .ogo-ai-consent[hidden] { display: none; }
+#ogo-panel .ogo-ai-consent h2 { margin: 0; font-size: 17px; }
+#ogo-panel .ogo-ai-consent p,#ogo-panel .ogo-ai-result-note { color: #74685d; font-size: 12px; line-height: 1.6; }
+#ogo-panel .ogo-ai-consent .ogo-folder-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#ogo-panel .ogo-ai-consent button,#ogo-panel .ogo-ai-results button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 7px 10px; color: #765541; background: #fff; font-size: 12px; }
+#ogo-panel .ogo-ai-result-head { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+#ogo-panel .ogo-ai-result-head strong { font-size: 16px; }
+#ogo-panel .ogo-ai-result-note { margin: 4px 0 10px; }
+#ogo-panel .ogo-ai-process { margin: 8px 0 12px; padding: 9px 11px; border: 1px solid #eadfd2; border-radius: 9px; color: #74685d; background: #fffaf4; font-size: 12px; line-height: 1.6; }
+#ogo-panel .ogo-ai-process summary { color: #765541; cursor: pointer; font-weight: 600; }
+#ogo-panel .ogo-ai-process ol { margin: 8px 0; padding-left: 20px; }
+#ogo-panel .ogo-ai-process p { margin: 6px 0 0; }
+#ogo-panel .ogo-ai-topic h3 { margin: 18px 0 8px; color: #765541; font-size: 14px; }
+#ogo-panel .ogo-ai-item { margin: 8px 0; padding: 11px; border: 1px solid #eadfd2; border-radius: 9px; background: #fff; }
+#ogo-panel .ogo-ai-item small { color: #8d7867; }
+#ogo-panel .ogo-ai-item p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.65; }
+#ogo-panel .ogo-ai-item details a { display: block; margin-top: 5px; color: #805c49; font-size: 11px; overflow-wrap: anywhere; }
+#ogo-panel .ogo-ai-toolbar .ogo-ai-primary { color: #fff; background: #805c49; border-color: #805c49; }
+#ogo-panel .ogo-ai-toolbar [data-action="ai-install-model"] { color: #805c49; background: #fff; }

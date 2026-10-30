@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
   "name": "橙光攻略整理器",
-  "version": "0.20.0",
-  "description": "在橙光作品页整理、收藏、导入和导出攻略评论。",
+  "version": "0.21.0",
+  "description": "在橙光作品页整理、收藏、导入、导出攻略评论，并支持本机 AI 去重。",
   "permissions": ["storage"],
+  "optional_host_permissions": ["http://localhost/*"],
+  "optional_permissions": ["scripting"],
+  "background": { "service_worker": "ai-worker.js" },
   "content_scripts": [
     {
       "matches": ["https://www.66rpg.com/game/*"],
