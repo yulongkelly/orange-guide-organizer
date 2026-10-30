@@ -284,14 +284,13 @@
   panel.id = "ogo-panel";
   panel.innerHTML = `
     <header><div><strong>攻略整理器</strong><small>评论收藏保存在本机</small></div><button data-action="close" aria-label="关闭">×</button></header>
-    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不向开发者或云端上传评论，也不读取登录凭据或 Cookie。可选的“AI 去重整理”仅在你主动点击并同意后，把评论正文和临时编号发送给你电脑上的 Ollama；作者、赞数和来源链接留在扩展中。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
+    <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不向开发者或云端上传评论，也不读取登录凭据或 Cookie。“定位攻略”中加入、导入或粘贴的文字只保存在本机；游戏时间功能只读取游戏画面上显示的年月和境界文字，不读取其他游戏内容，也不会上传。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
     <div class="ogo-toolbar"><input data-search placeholder="搜攻略内容 / 角色名"/><select data-sort aria-label="排序方式"><option value="page">页面顺序</option><option value="likes-desc">赞数从高到低</option><option value="likes-asc">赞数从低到高</option></select><button data-action="scan">重新扫描</button></div>
     <div class="ogo-bulk-toolbar"><button data-action="scan-all-pages">抓取全部页</button><small data-bulk-status>自动逐页收集评论，可随时停止</small></div>
-    <div class="ogo-ai-toolbar"><div><button data-action="ai-select-all">全选</button><button data-action="ai-select-none">清空选择</button><button class="ogo-ai-primary" data-action="ai-dedupe">AI 去重整理（0）</button><button data-action="ai-install-model" hidden>一键下载模型（约 2.5 GB）</button></div><small data-ai-status>仅使用本机 Ollama；评论不会发送到云端</small></div>
     <div class="ogo-flower-filter"><span>总花数</span><input type="number" min="0" data-flower-min placeholder="最低" aria-label="最低总花数"/><span>至</span><input type="number" min="0" data-flower-max placeholder="最高" aria-label="最高总花数"/><button data-action="clear-flower-filter">清除</button></div>
     <nav data-topics></nav><div class="ogo-folder-nav" data-folder-nav hidden></div><div class="ogo-fav-tools" data-fav-tools hidden><button data-action="select-all">全选当前列表</button><button data-action="folder-create" disabled>新建文件夹（0）</button><button data-action="folder-delete" hidden>删除文件夹</button><button data-action="export-selected" disabled>导出所选</button><button data-action="export-all">导出全部</button><button data-action="choose-import">导入 JSON</button><input data-import-file type="file" accept=".json,application/json" hidden></div><div class="ogo-status" data-status>正在扫描页面…</div><main data-results></main>
-    <section class="ogo-folder-dialog" data-folder-dialog hidden><div class="ogo-folder-head"><strong>新建文件夹</strong><button data-action="close-folder">×</button></div><p>选中的收藏会放进文件夹，每条评论仍单独保留。</p><input data-folder-name placeholder="文件夹名称，例如：灵兽收集攻略"/><div class="ogo-folder-actions"><button data-action="close-folder">取消</button><button data-action="confirm-folder">创建</button></div></section>
-    <section class="ogo-import-dialog" data-import-dialog hidden><div class="ogo-folder-head"><strong>导入收藏备份</strong><button data-action="close-import">×</button></div><p data-import-summary></p><div class="ogo-folder-actions"><button data-action="close-import">取消</button><button data-action="confirm-import" disabled>合并导入</button></div></section><section class="ogo-ai-consent" data-ai-consent role="dialog" aria-modal="true" hidden><h2>启用本机 AI 去重</h2><p>整理时，所选评论正文和临时编号会发送给运行在你电脑上的 Ollama（默认模型 qwen3:4b）。作者、赞数、作品和来源链接不会发送。内容不会发往云端模型，也不会保存整理结果。</p><p>继续即表示同意此项本机处理。扩展还会请求访问 localhost，以连接 Ollama。</p><div class="ogo-folder-actions"><button data-action="cancel-ai-consent">取消</button><button data-action="accept-ai-consent">同意并继续</button></div></section><section class="ogo-ai-results" data-ai-results hidden></section>`;
+    <input data-loc-file type="file" accept=".md,.txt,text/markdown,text/plain" hidden><section class="ogo-folder-dialog" data-paste-dialog hidden><div class="ogo-folder-head"><strong>粘贴攻略</strong><button data-action="close-paste">×</button></div><p>粘贴的文字按纯文本显示。想要清晰的标题和分节，请导入 .md 文件。只保存在本机，不影响收藏。</p><input data-paste-name placeholder="攻略名称，例如：凡人期攻略"/><textarea data-paste-text rows="8" placeholder="在这里粘贴攻略文字"></textarea><div class="ogo-folder-actions"><button data-action="close-paste">取消</button><button data-action="confirm-paste">保存</button></div></section><section class="ogo-folder-dialog" data-folder-dialog hidden><div class="ogo-folder-head"><strong>新建文件夹</strong><button data-action="close-folder">×</button></div><p>选中的收藏会放进文件夹，每条评论仍单独保留。</p><input data-folder-name placeholder="文件夹名称，例如：灵兽收集攻略"/><div class="ogo-folder-actions"><button data-action="close-folder">取消</button><button data-action="confirm-folder">创建</button></div></section>
+    <section class="ogo-import-dialog" data-import-dialog hidden><div class="ogo-folder-head"><strong>导入收藏备份</strong><button data-action="close-import">×</button></div><p data-import-summary></p><div class="ogo-folder-actions"><button data-action="close-import">取消</button><button data-action="confirm-import" disabled>合并导入</button></div></section>`;
   document.documentElement.append(panel);
   const launcher = document.createElement("button");
   launcher.id = "ogo-launcher";
@@ -312,15 +311,25 @@
   let pendingImport = null;
   const expandedWorks = new Set();
   const selectedFavorites = new Set();
-  const selectedAiRecords = new Set();
-  let aiRunning = false;
-  let aiCancelled = false;
-  let aiResult = null;
-  let aiModelMissing = false;
-  let aiDownloadRunning = false;
-  let aiDownloadPort = null;
-  let aiStatusMessage = "";
   let scanTimer;
+  const timeApi = globalThis.OgoTimePoints;
+  const workId = location.pathname.match(/\/game\/(\d+)/)?.[1] || "";
+  const GAME_STAGES = ["凡人期", "练气期", "筑基期", "金丹期", "元婴期", "化神期"];
+  const STALE_AFTER = 10 * 60 * 1000;
+  let gameTimeRead = null;
+  let gameTimeManual = null;
+  let guides = [];
+  let followGame = true;
+  let previewOffset = 0;
+  let locateMessage = "";
+  let lastLocateKey = "";
+  let locateUserScrolled = false;
+  let ignoreScrollUntil = 0;
+  const expandedGuides = new Set();
+  let adjustOpen = false;
+  let guidesOpen = false;
+  const secOpen = new Map();
+  const mdApi = globalThis.OgoMarkdown;
   let consentGranted = false;
   let bulkScanRunning = false;
   let bulkStopRequested = false;
@@ -336,25 +345,150 @@
   const folderDialog = panel.querySelector("[data-folder-dialog]");
   const importDialog = panel.querySelector("[data-import-dialog]");
   const importFileInput = panel.querySelector("[data-import-file]");
-  const aiConsentScreen = panel.querySelector("[data-ai-consent]");
+  const locateFileInput = panel.querySelector("[data-loc-file]");
+  const pasteDialog = panel.querySelector("[data-paste-dialog]");
   const loadFavorites = () => new Promise((resolve) => chrome.storage.local.get({ ogoFavorites: {}, ogoFolders: {} }, (data) => { favorites = data.ogoFavorites || {}; folders = data.ogoFolders || {}; resolve(); }));
   const saveFavorites = () => new Promise((resolve) => chrome.storage.local.set({ ogoFavorites: favorites }, resolve));
   const saveFolders = () => new Promise((resolve) => chrome.storage.local.set({ ogoFolders: folders }, resolve));
+  const loadGameTime = () => new Promise((resolve) => chrome.storage.local.get({ ogoGameTimeV1: {}, [`ogoLocate:${workId}`]: null }, (data) => {
+    const saved = data.ogoGameTimeV1?.[workId];
+    gameTimeRead = saved?.read || null;
+    gameTimeManual = saved?.manual || null;
+    const locate = data[`ogoLocate:${workId}`];
+    guides = Array.isArray(locate?.guides) ? locate.guides.filter((g) => g && typeof g.id === "string" && typeof g.text === "string") : [];
+    followGame = locate?.follow !== false;
+    resolve();
+  }));
+  const saveGameTime = () => new Promise((resolve) => chrome.storage.local.get({ ogoGameTimeV1: {} }, (data) => {
+    const all = data.ogoGameTimeV1 || {};
+    all[workId] = { read: gameTimeRead, manual: gameTimeManual };
+    chrome.storage.local.set({ ogoGameTimeV1: all }, () => { if (chrome.runtime.lastError) locateMessage = `保存游戏时间失败：${chrome.runtime.lastError.message}`; resolve(); });
+  }));
+  const saveLocate = () => new Promise((resolve) => chrome.storage.local.set({ [`ogoLocate:${workId}`]: { guides, follow: followGame } }, () => {
+    const failed = chrome.runtime.lastError?.message;
+    if (failed) locateMessage = `保存失败（浏览器存储可能已满）：${failed}`;
+    resolve(!failed);
+  }));
+  const readTime = () => (gameTimeRead?.month != null ? gameTimeRead : null);
+  const manualTime = () => (gameTimeManual ? { calendar: "", year: gameTimeManual.year, month: gameTimeManual.month, stage: gameTimeRead?.stage || "" } : null);
+  // "Follow game" uses what the game frame reported (falling back to the manual value); otherwise the manual value wins.
+  const currentGameTime = () => (followGame ? readTime() || manualTime() : manualTime() || readTime());
+  const formatGameTime = (t) => `${t.calendar || ""}${t.year != null ? `${t.year}年` : ""}${t.month != null ? `${t.month}月` : ""}${t.stage ? ` · ${t.stage}` : ""}`;
+  const shiftTime = (t, delta) => {
+    const index = t.month - 1 + delta;
+    return { ...t, month: ((index % 12) + 12) % 12 + 1, year: t.year != null ? t.year + Math.floor(index / 12) : null };
+  };
+  // The game runs in an h5 iframe of this work page; a message counts only if its sender is that frame (or a frame inside it).
+  const gameFrame = () => [...document.querySelectorAll("iframe")].find((el) => workId && new RegExp(`^https://(?:www\\.)?66rpg\\.com/h5/${workId}(?:[/?#]|$)`).test(el.src));
+  const fromGameFrame = (event) => {
+    if (!/^https:\/\/(?:www\.)?66rpg\.com$/.test(event.origin)) return false;
+    const frame = gameFrame();
+    if (!frame) return false;
+    let source = event.source;
+    for (let depth = 0; source && depth < 4; depth++) {
+      if (source === frame.contentWindow) return true;
+      try { if (source.parent === source) break; source = source.parent; } catch { break; }
+    }
+    return false;
+  };
+  const acceptGameTimeMessage = (event) => {
+    const d = event.data;
+    if (!d || d.type !== "ogo-game-time" || !fromGameFrame(event)) return;
+    const intIn = (v, lo, hi) => v === null || (Number.isInteger(v) && v >= lo && v <= hi);
+    if (!["", "庆和", "修炼"].includes(d.calendar) || !intIn(d.year, 0, 999) || !intIn(d.month, 1, 12) || d.month === null || !(d.stage === "" || GAME_STAGES.includes(d.stage))) return;
+    gameTimeRead = { calendar: d.calendar, year: d.year, month: d.month, stage: d.stage, at: Date.now() };
+    saveGameTime();
+    render();
+  };
 
-  const aiKey = (r) => `${r.key || makeKey(r.text)}|${r.author || ""}|${r.postedAt || ""}|${r.flowerLine || ""}`;
+  const sectionCache = new Map();
+  // Only imported .md files are rendered as Markdown; comments, pasted text and .txt files stay plain text.
+  const isMd = (guide) => (guide.format ? guide.format === "md" : guide.source === "file");
+  const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text) : mdApi.renderPlain(text));
+  const sectionsOf = (guide) => {
+    const key = `${guide.id}:${guide.text.length}:${isMd(guide)}`;
+    if (!sectionCache.has(key)) sectionCache.set(key, timeApi.splitGuideSections(guide.text, { headings: isMd(guide) }));
+    return sectionCache.get(key);
+  };
+  const newGuideId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+  const guessStage = (...texts) => GAME_STAGES.find((stage) => texts.some((t) => String(t || "").includes(stage.replace(/期$/, "")))) || "";
+  async function addGuide(name, text, source, format = "text") {
+    const body = String(text || "").replace(/\r\n?/g, "\n").trim();
+    if (!body) { locateMessage = "没有可加入的文字。"; render(); return false; }
+    if (body.length > 200000) { locateMessage = "这份攻略超过 20 万字，无法加入。"; render(); return false; }
+    if (guides.length >= 50) { locateMessage = "最多保存 50 份攻略，请先删除不用的。"; render(); return false; }
+    if (guides.some((g) => g.text === body)) { locateMessage = "这份攻略已经在定位列表里了。"; render(); return false; }
+    const guide = { id: newGuideId(), name: String(name || "未命名攻略").trim().slice(0, 60) || "未命名攻略", text: body, stage: guessStage(name), enabled: guides.length === 0, source, format, createdAt: Date.now() };
+    guides.push(guide);
+    locateMessage = "";
+    if (!(await saveLocate())) guides.pop();
+    else guidesOpen = true, locateMessage = `已加入“${guide.name}”，勾选后即可定位。${format === "md" ? "" : "想要清晰的标题和分节，请导入 .md 文件。"}`;
+    render();
+    return !locateMessage.includes("失败");
+  }
+
+  const formatLongTime = (t) => `${t.calendar ? `${t.calendar} ` : ""}${t.year != null ? `${t.year} 年 ` : ""}${t.month != null ? `${t.month} 月` : ""}`.trim();
+  const monthsLabel = (section) => [...new Set(section.points.map((p) => p.label))].slice(0, 4).join("、");
+  const startsWithHeading = (e) => isMd(e.guide) && /^#{1,6}\s/.test(e.section.text);
+  const bodyOf = (e) => (startsWithHeading(e) ? e.section.text.replace(/^#{1,6}\s+.*\n?/, "") : e.section.text);
+  const sectionKey = (guide, index) => `${guide.id}:${index}`;
+  function renderLocate() {
+    const base = currentGameTime();
+    const shown = base && previewOffset ? shiftTime(base, previewOffset) : base;
+    const manual = gameTimeManual || {};
+    const usingRead = followGame && readTime();
+    const selected = guides.filter((g) => g.enabled);
+    const entries = [];
+    for (const guide of selected) sectionsOf(guide).forEach((section, index) => entries.push({ guide, section, key: sectionKey(guide, index), ahead: shown && section.kind === "time" ? timeApi.sectionAhead(section, shown) : null }));
+    const timed = entries.filter((e) => e.section.kind === "time").sort((a, b) => a.section.order - b.section.order);
+    const general = entries.filter((e) => e.section.kind === "general");
+    const nextAhead = Math.min(...timed.filter((e) => e.ahead != null && e.ahead > 0).map((e) => e.ahead));
+    const nowEntries = timed.filter((e) => e.ahead === 0);
+    const nextEntries = Number.isFinite(nextAhead) ? timed.filter((e) => e.ahead === nextAhead) : [];
+    const many = selected.length > 1;
+    const stageWarnings = selected.filter((g) => g.stage && base?.stage && g.stage !== base.stage).map((g) => `当前已是${base.stage}，“${g.name}”标注为${g.stage}攻略（仅提示，不会自动切换）。`);
+    const stale = gameTimeRead && Date.now() - gameTimeRead.at > STALE_AFTER;
+    const when = gameTimeRead ? new Date(gameTimeRead.at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "";
+
+    const card = (e) => {
+      const isNow = e.ahead === 0;
+      const isNext = !isNow && nextEntries.includes(e);
+      const title = startsWithHeading(e) || e.section.kind === "general" ? e.section.title : monthsLabel(e.section);
+      const open = secOpen.has(e.key) ? secOpen.get(e.key) : isNow;
+      const flag = isNow ? `<span class="ogo-sec-flag now">当前</span>` : isNext ? `<span class="ogo-sec-flag next">接下来 · ${e.ahead} 个月后</span>` : "";
+      return `<details class="ogo-sec ${isNow ? "now" : ""}" data-sec-key="${escapeHtml(e.key)}" data-default="${isNow ? 1 : 0}" ${open ? "open" : ""} ${isNow || (isNext && !nowEntries.length) ? "data-loc-anchor" : ""}><summary><span class="ogo-sec-title">${escapeHtml(title)}</span>${flag}${many ? `<span class="ogo-loc-guide-tag">${escapeHtml(e.guide.name)}</span>` : ""}<span class="ogo-sec-brief">${escapeHtml((isMd(e.guide) ? mdApi.summarizeMarkdown : mdApi.summarizePlain)(bodyOf(e)))}</span></summary><div class="ogo-md">${renderGuideText(e.guide, bodyOf(e))}</div></details>`;
+    };
+    const guideRow = (g) => {
+      const timedCount = sectionsOf(g).filter((s) => s.kind === "time").length;
+      return `<div class="ogo-loc-guide"><label class="ogo-loc-pick"><input type="checkbox" data-loc-toggle="${escapeHtml(g.id)}" ${g.enabled ? "checked" : ""}/><b>${escapeHtml(g.name)}</b></label><div class="ogo-loc-guide-actions"><small>${timedCount ? `${timedCount} 段` : "无时间点"}</small><select data-loc-stage="${escapeHtml(g.id)}" aria-label="适用境界"><option value="">境界不限</option>${GAME_STAGES.map((s) => `<option ${g.stage === s ? "selected" : ""}>${s}</option>`).join("")}</select><button data-loc-only="${escapeHtml(g.id)}">只用这份</button><button data-loc-view="${escapeHtml(g.id)}">${expandedGuides.has(g.id) ? "收起全文" : "全文"}</button><button data-loc-rename="${escapeHtml(g.id)}">改名</button><button data-loc-delete="${escapeHtml(g.id)}">删除</button></div>${expandedGuides.has(g.id) ? `<div class="ogo-md ogo-loc-full">${renderGuideText(g, g.text)}</div>` : ""}</div>`;
+    };
+    let body;
+    if (!guides.length) body = `<div class="ogo-empty">还没有定位用的攻略。<br>点上方“导入 .md/.txt”或“粘贴文字”，也可以在攻略或收藏卡片上点“加入定位”。<br>想要清晰的标题和分节，请导入 .md 文件。</div>`;
+    else if (!selected.length) body = `<div class="ogo-empty">没有选中任何攻略。勾选上方的攻略后，才会按游戏时间定位。</div>`;
+    else if (!timed.length) body = `<div class="ogo-empty">选中的攻略里没有识别到月份或年份，无法定位。可以点“全文”查看原文。</div>`;
+    else body = `<div class="ogo-loc-toolbar"><button data-loc-jump>回到当前位置</button><span><button data-loc-fold="open">全部展开</button><button data-loc-fold="closed">全部折叠</button></span></div>${!shown ? `<div class="ogo-loc-hint">还没有当前游戏时间，读取到或手动输入后会标出当前位置。</div>` : !nowEntries.length ? `<div class="ogo-loc-hint">${escapeHtml(formatLongTime(shown))}没有对应的内容。</div>` : ""}<div class="ogo-sec-list">${timed.map(card).join("")}</div>`;
+    if (selected.length && general.length) body += `<details class="ogo-loc-general"><summary>通用内容（${general.length} 段，不按时间定位）</summary>${general.map(card).join("")}</details>`;
+
+    const keepScroll = results.scrollTop;
+    results.innerHTML = `<div class="ogo-loc-top"><div class="ogo-loc-now-line"><strong>${base ? escapeHtml(formatLongTime(previewOffset && shown ? shown : base)) : "未读取游戏时间"}</strong><span>${previewOffset ? "· 预览" : base ? (usingRead ? "· 自动读取" : "· 手动") : ""}</span></div><small class="${!base || stale ? "ogo-time-stale" : ""}">${gameTimeRead ? `更新于 ${when}${stale ? "，可能已过期；打开游戏状态页可刷新" : ""}` : "打开游戏状态页后自动读取，也可手动输入"}</small><details class="ogo-loc-adjust" data-adjust ${adjustOpen ? "open" : ""}><summary>调整时间 / 预览</summary><div class="ogo-time-manual"><input type="number" min="0" max="999" data-time-year placeholder="年" value="${manual.year ?? ""}" aria-label="手动输入年"/><input type="number" min="1" max="12" data-time-month placeholder="月" value="${manual.month ?? ""}" aria-label="手动输入月"/><button data-action="time-save">设定</button><button data-action="time-clear">清除手动值</button></div><label class="ogo-loc-follow"><input type="checkbox" data-loc-follow ${followGame ? "checked" : ""}/>跟随游戏时间（关闭后使用手动值）</label><div class="ogo-loc-preview"><button data-loc-shift="-1">‹ 上一月</button><span>${previewOffset && shown ? `预览 ${escapeHtml(formatLongTime(shown))}` : "预览：当前"}</span><button data-loc-shift="1">下一月 ›</button><button data-loc-shift="0" ${previewOffset ? "" : "disabled"}>还原</button></div></details></div><details class="ogo-loc-guides" data-guides ${guidesOpen ? "open" : ""}><summary>攻略 ${guides.length} 份 · 已选 ${selected.length}</summary><div class="ogo-loc-head"><span>${locateMessage ? `<small class="ogo-loc-message">${escapeHtml(locateMessage)}</small>` : ""}</span><span><button data-loc-import>导入 .md/.txt</button><button data-loc-paste>粘贴文字</button></span></div>${stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("")}${guides.map(guideRow).join("")}</details>${stageWarnings.length && !guidesOpen ? stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("") : ""}${body}`;
+    const anchorKey = `${shown ? `${shown.year}-${shown.month}` : ""}|${selected.map((g) => g.id).join(",")}`;
+    const anchor = results.querySelector("[data-loc-anchor]");
+    if (anchorKey !== lastLocateKey && !locateUserScrolled && anchor) {
+      lastLocateKey = anchorKey;
+      scrollLocateTo(anchor);
+    } else {
+      if (anchorKey !== lastLocateKey && !anchor) lastLocateKey = anchorKey;
+      results.scrollTop = keepScroll;
+    }
+  }
+  function scrollLocateTo(anchor) {
+    ignoreScrollUntil = Date.now() + 700;
+    results.scrollTop += anchor.getBoundingClientRect().top - results.getBoundingClientRect().top - 8;
+  }
+
   function render() {
-    const aiToolbar = panel.querySelector(".ogo-ai-toolbar");
-    aiToolbar.hidden = activeTopic === "收藏" || Boolean(aiResult);
-    const selectedAiCount = records.filter((r) => selectedAiRecords.has(aiKey(r))).length;
-    const aiButton = aiToolbar.querySelector("[data-action=ai-dedupe]");
-    aiButton.textContent = aiRunning ? "取消整理" : `AI 去重整理（${selectedAiCount}）`;
-    aiButton.disabled = !aiRunning && selectedAiCount < 2;
-    const installModelButton = aiToolbar.querySelector("[data-action=ai-install-model]");
-    installModelButton.hidden = !aiModelMissing;
-    installModelButton.textContent = aiDownloadRunning ? "取消下载" : "一键下载模型（约 2.5 GB）";
-    aiToolbar.querySelector("[data-ai-status]").textContent = aiRunning ? panel.dataset.aiProgress || "正在整理…" : aiDownloadRunning ? panel.dataset.aiProgress || "正在准备下载…" : aiStatusMessage || "仅使用本机 Ollama；评论不会发送到云端";
-    const topicsFound = ["全部", ...new Set(records.map((r) => r.topic)), "收藏"];
-    topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : ""}</button>`).join("");
+    const topicsFound = ["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
+    topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : topic === "定位" && guides.length ? ` ${guides.length}` : ""}</button>`).join("");
     folderNav.hidden = activeTopic !== "收藏";
     folderNav.innerHTML = `<button class="${activeFolderId === null ? "active" : ""}" data-folder-filter="">全部收藏</button>` + Object.values(folders).map((folder) => {
       const count = (folder.items || []).filter((key) => favorites[key]).length;
@@ -369,6 +503,8 @@
     const deleteFolderButton = favoriteTools.querySelector('[data-action="folder-delete"]');
     deleteFolderButton.hidden = activeTopic !== "收藏" || activeFolderId === null;
     if (activeFolderId !== null) deleteFolderButton.dataset.folderId = activeFolderId;
+    panel.classList.toggle("ogo-locating", activeTopic === "定位");
+    if (activeTopic === "定位") { renderLocate(); return; }
     let items;
     let workGroups = null;
     if (activeTopic === "收藏") {
@@ -406,12 +542,10 @@
         : `<a class="ogo-origin" href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">打开作品页 ↗</a>`;
       const likeLabel = r.likes == null ? "赞数未知" : `赞 ${r.likes}`;
       const flowerLabel = r.flowers == null ? "花数未知" : `🌸 ${r.flowers}`;
-      const aiSelect = activeTopic !== "收藏" ? `<label class="ogo-ai-select" title="选择用于 AI 去重"><input type="checkbox" data-ai-select="${escapeHtml(aiKey(r))}" ${selectedAiRecords.has(aiKey(r)) ? "checked" : ""}/>AI</label>` : "";
       const selectFavorite = r.saved && activeTopic === "收藏" ? `<label class="ogo-select"><input type="checkbox" data-select-fav="${escapeHtml(key)}" ${selectedFavorites.has(key) ? "checked" : ""}/>选入文件夹</label>` : "";
       const exportOneButton = isSaved ? `<button data-export-favorite="${escapeHtml(key)}">导出</button>` : "";
-      return `<article class="ogo-card"><div class="ogo-card-head"><span class="ogo-badge">${escapeHtml(r.topic || "已收藏")}</span><div class="ogo-actions">${aiSelect}${selectFavorite}<span class="ogo-likes">${likeLabel} · ${flowerLabel}</span>${exportOneButton}${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(r.text)}</p></article>`;
+      return `<article class="ogo-card"><div class="ogo-card-head"><span class="ogo-badge">${escapeHtml(r.topic || "已收藏")}</span><div class="ogo-actions">${selectFavorite}<span class="ogo-likes">${likeLabel} · ${flowerLabel}</span>${exportOneButton}<button data-locate-add="${escapeHtml(key)}" title="想要清晰的标题和分节，请导入 .md 文件。">加入定位</button>${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(r.text)}</p></article>`;
     };
-    if (aiResult) { renderAiResults(); return; }
     if (workGroups) {
       results.innerHTML = [...workGroups.entries()].sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([title, entries]) => {
         const url = entries[0]?.url || "";
@@ -426,170 +560,10 @@
     if (!items.length) results.innerHTML = `<div class="ogo-empty">${activeTopic === "收藏" ? (activeFolderId ? "这个文件夹还没有评论。" : "还没有收藏。看到喜欢的攻略评论，点它旁边的“☆ 收藏”即可。") : records.length ? "没有符合搜索条件的评论。" : "还没找到攻略评论。先展开“全部互动”，再滚动加载评论后点重新扫描。"}</div>`;
   }
 
-  function renderAiResults() {
-    const topicGroups = new Map();
-    for (const group of aiResult || []) {
-      const topic = group[0]?.topic || "其他攻略";
-      if (!topicGroups.has(topic)) topicGroups.set(topic, []);
-      topicGroups.get(topic).push(group);
-    }
-    const total = (aiResult || []).reduce((sum, group) => sum + group.length, 0);
-    const merged = (aiResult || []).filter((group) => group.length > 1);
-    const mergedComments = merged.reduce((sum, group) => sum + group.length, 0);
-    const duplicateCount = merged.reduce((sum, group) => sum + group.length - 1, 0);
-    const keptSeparate = total - mergedComments;
-    results.innerHTML = `<div class="ogo-ai-result-head"><strong>AI 去重整理结果</strong><button data-action="ai-close-result">返回攻略</button></div><p class="ogo-ai-result-note">共检查 ${total} 条：合并 ${merged.length} 组重复内容，减少 ${duplicateCount} 条重复；${keptSeparate} 条没有发现重复，分别保留。不同主题、阶段、路线、条件和数值不会强行合并。</p><details class="ogo-ai-process"><summary>查看整理过程与判断依据</summary><ol><li>检查你勾选的 ${total} 条评论，只把正文发给本机 Ollama 分析。</li><li>按作品页面已有主题显示结果；不让模型改写攻略正文。</li><li>只有实质相同的建议才合并，并保留所有作者和来源；赞数较高的原文作为展示内容。</li><li>阶段、条件、路线、对象或数值不同，或无法确定是否重复时，单独保留。</li></ol>${merged.length ? `<p>识别到 ${merged.length} 组重复内容：</p>` : `<p>这次没有找到足够确定的重复建议，因此没有合并。内容相似但攻略路线或适用条件不同的条目会分别保留。</p>`}</details><button data-action="ai-copy-result">复制整理结果</button>${[...topicGroups.entries()].map(([topic, groups]) => `<section class="ogo-ai-topic"><h3>${escapeHtml(topic)}</h3>${groups.map((group) => {
-      const representative = [...group].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1) || a.index - b.index)[0];
-      const authors = [...new Set(group.map((r) => r.author || "作者未知"))];
-      const sources = group.map((r) => `<a href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">${escapeHtml(r.author || "作者未知")} · ${r.likes == null ? "赞数未知" : `赞 ${r.likes}`} · ${escapeHtml(r.postedAt || "原评论")}</a>`).join("");
-      return `<article class="ogo-ai-item"><small>合并 ${group.length} 条 · 作者：${authors.map(escapeHtml).join("、")}</small><p>${escapeHtml(representative.text)}</p><details><summary>查看 ${group.length} 个来源</summary>${sources}</details></article>`;
-    }).join("")}</section>`).join("")}`;
-  }
-
-  const aiMarkdown = () => {
-    const lines = ["# AI 去重整理攻略", ""];
-    const topics = new Map();
-    for (const group of aiResult || []) {
-      const topic = group[0]?.topic || "其他攻略";
-      if (!topics.has(topic)) topics.set(topic, []);
-      topics.get(topic).push(group);
-    }
-    for (const [topic, groups] of topics) {
-      lines.push(`## ${topic}`, "");
-      for (const group of groups) {
-        const rep = [...group].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1) || a.index - b.index)[0];
-        lines.push(rep.text, "", `作者：${[...new Set(group.map((r) => r.author || "作者未知"))].join("、")}`);
-        lines.push(...group.map((r) => `来源：${r.url || location.href}（${r.author || "作者未知"}${r.likes == null ? "" : `，赞 ${r.likes}`}）`), "");
-      }
-    }
-    return lines.join("\n");
-  };
-
-  async function beginAiDedupe() {
-    const chosen = records.filter((r) => selectedAiRecords.has(aiKey(r)));
-    if (chosen.length < 2) return;
-    aiRunning = true; aiCancelled = false; aiResult = null;
-    const requestId = `ogo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    panel.dataset.aiRequestId = requestId;
-    panel.dataset.aiProgress = `检查 Ollama… 已选择 ${chosen.length} 条`;
-    render();
-    const call = (message) => new Promise((resolve, reject) => chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(response);
-    }));
-    try {
-      const consent = await new Promise((resolve) => chrome.storage.local.get({ ogoLocalAiConsentV1: false }, (data) => resolve(data.ogoLocalAiConsentV1)));
-      if (aiCancelled) return;
-      if (!consent) {
-        aiRunning = false;
-        aiConsentScreen.hidden = false;
-        panel.dataset.aiPending = "1";
-        render();
-        return;
-      }
-      const authorized = await call({ type: "ogo-ai-authorize" });
-      if (aiCancelled) return;
-      if (!authorized?.ok && authorized?.code === "permission") {
-        aiRunning = false;
-        await call({ type: "ogo-ai-open-setup" });
-        panel.dataset.aiProgress = "请在新打开的设置页连接 Ollama；连接成功后回到这里重新点击整理。";
-        render();
-        panel.querySelector("[data-ai-status]").textContent = "请在新打开的本机 AI 设置页完成授权。";
-        return;
-      }
-      if (!authorized?.ok && authorized?.code === "model") {
-        aiRunning = false; aiModelMissing = true; aiStatusMessage = authorized.message; render(); return;
-      }
-      if (!authorized?.ok) throw new Error(authorized?.message || "无法连接本机 Ollama。");
-      aiModelMissing = false; aiStatusMessage = "";
-      const idToRecord = new Map();
-      const payload = chosen.map((record, index) => {
-        const id = String(index + 1); idToRecord.set(id, record);
-        return { id, text: record.text };
-      });
-      panel.dataset.aiProgress = `正在本机逐条比较 ${chosen.length} 条评论；阶段、路线和条件不同的会分开保留…`;
-      render();
-      const response = await call({ type: "ogo-ai-dedupe", requestId, items: payload });
-      if (aiCancelled) return;
-      if (!response?.ok) {
-        if (response?.code === "cancelled") return;
-        throw new Error(response?.message || "模型未能完成整理。");
-      }
-      const groups = [];
-      for (const ids of response.groups) {
-        const bucket = new Map();
-        for (const id of ids) {
-          const record = idToRecord.get(id);
-          if (!record) throw new Error("模型结果引用了未知评论");
-          const safeKey = `${record.topic}|${JSON.stringify((record.text.match(/\d+(?:\.\d+)?(?:万|亿|点|级|年|月|天|次|个|岁|%|％)?/g) || []).sort())}|${JSON.stringify((record.text.match(/(?:练气|筑基|金丹|元婴|化神|炼虚|合体|大乘|渡劫)(?:期|境)?/g) || []).sort())}|${JSON.stringify((record.text.match(/(?:如果|若是|若|当|达到|需要|必须|仅限|至少|最多|超过|之前|之后|未满|除非).{0,16}/g) || []).sort())}`;
-          if (!bucket.has(safeKey)) bucket.set(safeKey, []);
-          bucket.get(safeKey).push(record);
-        }
-        groups.push(...bucket.values());
-      }
-      aiResult = groups;
-      aiRunning = false;
-      panel.dataset.aiProgress = "";
-      render();
-    } catch (error) {
-      aiRunning = false;
-      panel.dataset.aiProgress = "";
-      aiStatusMessage = error.message || "本机模型未能完成整理。";
-      render();
-    }
-  }
-
-  function startAiModelInstall() {
-    if (aiDownloadRunning) {
-      aiDownloadPort?.postMessage({ action: "cancel" });
-      aiDownloadRunning = false;
-      panel.dataset.aiProgress = "正在取消下载…";
-      render();
-      return;
-    }
-    aiDownloadRunning = true;
-    aiStatusMessage = "";
-    panel.dataset.aiProgress = "正在通过 Ollama 安全连接下载…";
-    render();
-    const port = chrome.runtime.connect({ name: "ogo-ai-install-model" });
-    aiDownloadPort = port;
-    port.onMessage.addListener((message) => {
-      if (message.type === "progress") {
-        const percent = message.percent == null ? "" : ` ${message.percent}%`;
-        panel.dataset.aiProgress = `${message.status}${percent}；请保持 Ollama 打开`;
-        render();
-      } else if (message.type === "done") {
-        aiDownloadRunning = false;
-        aiDownloadPort = null;
-        panel.dataset.aiProgress = "";
-        if (message.ok) {
-          aiModelMissing = false;
-          aiStatusMessage = "模型下载完成。现在点击 AI 去重整理即可开始。";
-        } else if (message.cancelled) {
-          aiStatusMessage = "下载已取消。需要时可以再次点击下载。";
-        } else {
-          aiStatusMessage = `模型下载失败：${message.error || "请确认 Ollama 已打开后重试。"}`;
-        }
-        render();
-      }
-    });
-    port.onDisconnect.addListener(() => {
-      if (aiDownloadRunning) {
-        aiDownloadRunning = false; aiDownloadPort = null;
-        aiStatusMessage = "下载连接中断。请确认 Ollama 已打开后重试。";
-        render();
-      }
-    });
-    port.postMessage({ action: "pull" });
-  }
-
   function scan() {
-    if (!consentGranted || bulkScanRunning || aiRunning || aiResult || Date.now() < ignorePaginationMutationsUntil) return;
+    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) return;
     bulkStatusMessage = "";
     records = recordsOnCurrentPage();
-    selectedAiRecords.clear();
-    for (const record of records) selectedAiRecords.add(aiKey(record));
-    aiResult = null;
     let migratedTitle = false;
     for (const favorite of Object.values(favorites)) {
       if (!favorite.workTitle && favorite.url?.split("#")[0] === location.href.split("#")[0]) {
@@ -604,7 +578,6 @@
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const showCollectedBulkRecords = (collected) => {
     records = [...collected.values()].map((record, index) => ({ ...record, index }));
-    for (const record of records) if (!selectedAiRecords.has(aiKey(record))) selectedAiRecords.add(aiKey(record));
   };
   async function scanAllPages() {
     if (bulkScanRunning) {
@@ -701,27 +674,7 @@
   }
 
   launcher.addEventListener("click", () => panel.classList.toggle("open"));
-  panel.addEventListener("change", (event) => {
-    const checkbox = event.target.closest("[data-ai-select]");
-    if (checkbox) { if (checkbox.checked) selectedAiRecords.add(checkbox.dataset.aiSelect); else selectedAiRecords.delete(checkbox.dataset.aiSelect); render(); }
-  });
   panel.addEventListener("click", async (event) => {
-    if (event.target.closest('[data-action="ai-install-model"]')) startAiModelInstall();
-    if (event.target.closest('[data-action="ai-select-all"]')) { for (const r of records) selectedAiRecords.add(aiKey(r)); render(); }
-    if (event.target.closest('[data-action="ai-select-none"]')) { selectedAiRecords.clear(); render(); }
-    if (event.target.closest('[data-action="ai-dedupe"]')) {
-      if (aiRunning) { aiCancelled = true; chrome.runtime.sendMessage({ type: "ogo-ai-cancel", requestId: panel.dataset.aiRequestId }); aiRunning = false; panel.dataset.aiProgress = "已取消整理；已抓取攻略仍保留"; render(); }
-      else beginAiDedupe();
-    }
-    if (event.target.closest('[data-action="accept-ai-consent"]')) {
-      chrome.storage.local.set({ ogoLocalAiConsentV1: true }, () => { aiConsentScreen.hidden = true; panel.dataset.aiPending = ""; beginAiDedupe(); });
-    }
-    if (event.target.closest('[data-action="cancel-ai-consent"]')) { aiConsentScreen.hidden = true; panel.dataset.aiPending = ""; render(); }
-    if (event.target.closest('[data-action="ai-close-result"]')) { aiResult = null; render(); }
-    if (event.target.closest('[data-action="ai-copy-result"]')) {
-      try { await navigator.clipboard.writeText(aiMarkdown()); panel.querySelector("[data-ai-status]").textContent = "已复制整理结果。"; }
-      catch { panel.querySelector("[data-ai-status]").textContent = "复制失败；请检查浏览器剪贴板权限。"; }
-    }
     const close = event.target.closest('[data-action="close"]');
     if (close) panel.classList.remove("open");
     if (event.target.closest('[data-action="accept-consent"]')) {
@@ -892,12 +845,117 @@
       render();
     }
   });
+  const findGuide = (id) => guides.find((g) => g.id === id);
+  results.addEventListener("scroll", () => { if (activeTopic === "定位" && Date.now() > ignoreScrollUntil) locateUserScrolled = true; });
+  panel.addEventListener("change", async (event) => {
+    const t = event.target;
+    if (t.matches("[data-loc-follow]")) { followGame = t.checked; await saveLocate(); render(); }
+    if (t.matches("[data-loc-toggle]")) { const g = findGuide(t.dataset.locToggle); if (g) { g.enabled = t.checked; locateMessage = ""; await saveLocate(); render(); } }
+    if (t.matches("[data-loc-stage]")) { const g = findGuide(t.dataset.locStage); if (g) { g.stage = t.value; await saveLocate(); render(); } }
+    if (t.matches("[data-loc-file]")) {
+      const file = t.files?.[0];
+      t.value = "";
+      if (!file) return;
+      if (file.size > 1000000) { locateMessage = "文件超过 1 MB，无法导入。"; render(); return; }
+      let text;
+      try { text = await file.text(); } catch { locateMessage = "无法读取这个文件。"; render(); return; }
+      await addGuide(file.name.replace(/\.(?:md|txt|markdown)$/i, ""), text, "file", /\.(?:md|markdown)$/i.test(file.name) ? "md" : "text");
+    }
+  });
+  panel.addEventListener("click", async (event) => {
+    const target = event.target;
+    const idOf = (attr) => target.closest(`[${attr}]`)?.getAttribute(attr);
+    if (target.closest('[data-action="time-save"]')) {
+      const monthInput = panel.querySelector("[data-time-month]");
+      const yearInput = panel.querySelector("[data-time-year]");
+      const month = Number(monthInput.value);
+      const year = yearInput.value === "" ? null : Number(yearInput.value);
+      if (monthInput.value === "" || !Number.isInteger(month) || month < 1 || month > 12 || (year != null && (!Number.isInteger(year) || year < 0 || year > 999))) { monthInput.focus(); return; }
+      gameTimeManual = { year, month };
+      followGame = false;
+      previewOffset = 0;
+      await saveGameTime();
+      await saveLocate();
+      render();
+    }
+    if (target.closest('[data-action="time-clear"]')) {
+      gameTimeManual = null;
+      followGame = true;
+      previewOffset = 0;
+      await saveGameTime();
+      await saveLocate();
+      render();
+    }
+    const fold = idOf("data-loc-fold");
+    if (fold) {
+      for (const el of results.querySelectorAll("[data-sec-key]")) secOpen.set(el.dataset.secKey, fold === "open");
+      render();
+    }
+    if (target.closest("[data-loc-shift]")) {
+      const delta = Number(idOf("data-loc-shift"));
+      previewOffset = delta === 0 ? 0 : previewOffset + delta;
+      render();
+    }
+    if (target.closest("[data-loc-jump]")) {
+      locateUserScrolled = false;
+      lastLocateKey = "";
+      render();
+    }
+    if (target.closest("[data-loc-import]")) locateFileInput.click();
+    if (target.closest("[data-loc-paste]")) { pasteDialog.hidden = false; pasteDialog.querySelector("[data-paste-name]").focus(); }
+    if (target.closest('[data-action="close-paste"]')) pasteDialog.hidden = true;
+    if (target.closest('[data-action="confirm-paste"]')) {
+      const name = pasteDialog.querySelector("[data-paste-name]");
+      const text = pasteDialog.querySelector("[data-paste-text]");
+      if (!text.value.trim()) { text.focus(); return; }
+      if (await addGuide(name.value || "粘贴的攻略", text.value, "paste")) { name.value = ""; text.value = ""; pasteDialog.hidden = true; }
+    }
+    const only = idOf("data-loc-only");
+    if (only) { for (const g of guides) g.enabled = g.id === only; await saveLocate(); render(); }
+    const view = idOf("data-loc-view");
+    if (view) { if (expandedGuides.has(view)) expandedGuides.delete(view); else expandedGuides.add(view); render(); }
+    const rename = idOf("data-loc-rename");
+    if (rename) {
+      const g = findGuide(rename);
+      const name = g ? window.prompt("新的名称", g.name) : null;
+      if (g && name && name.trim()) { g.name = name.trim().slice(0, 60); await saveLocate(); render(); }
+    }
+    const del = idOf("data-loc-delete");
+    if (del) {
+      const g = findGuide(del);
+      if (g && window.confirm(`删除“${g.name}”？只删除定位用的这份副本，不影响收藏。`)) {
+        guides = guides.filter((x) => x.id !== del);
+        expandedGuides.delete(del);
+        await saveLocate();
+        render();
+      }
+    }
+    const add = target.closest("[data-locate-add]");
+    if (add) {
+      const key = add.dataset.locateAdd;
+      const record = records.find((r) => r.key === key) || favorites[key];
+      if (record) {
+        const label = `${record.author || "评论"} · ${record.text.replace(/\s+/g, " ").slice(0, 14)}`;
+        await addGuide(label, record.text, "comment");
+        status.textContent = locateMessage;
+      }
+    }
+  });
+  panel.addEventListener("toggle", (event) => {
+    const el = event.target;
+    if (el.matches?.("[data-sec-key]")) { if (el.open === (el.dataset.default === "1")) secOpen.delete(el.dataset.secKey); else secOpen.set(el.dataset.secKey, el.open); }
+    else if (el.matches?.("[data-adjust]")) adjustOpen = el.open;
+    else if (el.matches?.("[data-guides]")) guidesOpen = el.open;
+  }, true);
+  window.addEventListener("message", acceptGameTimeMessage);
+  setInterval(() => { if (activeTopic === "定位" && document.activeElement?.tagName !== "INPUT") render(); }, 60000);
   new MutationObserver(() => {
-    if (!consentGranted || bulkScanRunning || aiRunning || aiResult || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
+    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scan, 700);
   }).observe(document.body, { childList: true, subtree: true });
-  loadFavorites().then(() => chrome.storage.local.get({ ogoDataConsentV1: false }, (data) => {
+  chrome.storage.local.remove("ogoLocalAiConsentV1");
+  Promise.all([loadFavorites(), loadGameTime()]).then(() => chrome.storage.local.get({ ogoDataConsentV1: false }, (data) => {
     consentGranted = data.ogoDataConsentV1 === true;
     if (consentGranted) scan();
     else {

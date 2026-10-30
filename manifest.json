@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
   "name": "橙光攻略整理器",
-  "version": "0.21.0",
-  "description": "在橙光作品页整理、收藏、导入、导出攻略评论，并支持本机 AI 去重。",
+  "version": "0.22.0",
+  "description": "在橙光作品页整理、收藏、导入、导出攻略评论，并高亮带游戏年月的剧情点。",
   "permissions": ["storage"],
-  "optional_host_permissions": ["http://localhost/*"],
-  "optional_permissions": ["scripting"],
-  "background": { "service_worker": "ai-worker.js" },
   "content_scripts": [
     {
       "matches": ["https://www.66rpg.com/game/*"],
-      "js": ["content.js"],
+      "js": ["time-points.js", "markdown.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.66rpg.com/h5/*", "https://66rpg.com/h5/*"],
+      "js": ["game-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
     }
   ],
   "icons": {
