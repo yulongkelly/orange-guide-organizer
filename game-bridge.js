@@ -102,8 +102,10 @@
     if (joined) inspectText(joined, state);
     publish();
     if (keywords.length) {
-      const direct = value.length <= 60 ? findKeywords(value, keywords) : [];
-      publishKeywords(direct.length ? direct : findKeywords(recent, keywords));
+      // The month may be drawn just before the week, so a match in this text alone still has to hold in the rolling text.
+      const joinedFound = findKeywords(recent, keywords);
+      const direct = value.length <= 60 ? findKeywords(value, keywords).filter((keyword) => joinedFound.includes(keyword)) : [];
+      publishKeywords(direct.length ? direct : joinedFound);
     }
   };
 
