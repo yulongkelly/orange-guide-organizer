@@ -24,8 +24,10 @@
 #ogo-panel .ogo-flower-filter input { width: 76px; flex: 0 0 76px; padding: 7px 8px; }
 #ogo-panel .ogo-flower-filter button { border: 0; padding: 5px 2px; color: #8a5a48; background: transparent; font-size: 11px; }
 #ogo-panel .ogo-toolbar button { border: 0; border-radius: 8px; padding: 0 11px; background: #8a5a48; color: white; font-size: 12px; }
-#ogo-panel .ogo-bulk-toolbar { display: flex; align-items: center; gap: 9px; padding: 0 14px 9px; }
+#ogo-panel .ogo-bulk-toolbar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 0 14px 9px; }
 #ogo-panel .ogo-bulk-toolbar button { border: 1px solid #ddc9b1; border-radius: 8px; padding: 7px 10px; color: #765541; background: #fff; font: inherit; font-size: 11px; white-space: nowrap; }
+#ogo-panel .ogo-bulk-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
+#ogo-panel .ogo-bulk-toolbar button[hidden] { display: none; }
 #ogo-panel .ogo-bulk-toolbar small { color: #786d61; font-size: 10px; line-height: 1.45; }
 #ogo-panel nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 14px 10px; }
 #ogo-panel nav button { border: 1px solid #e2d5c5; border-radius: 99px; padding: 5px 9px; color: #695d51; background: #fff; font-size: 11px; }
@@ -133,6 +135,7 @@
 #ogo-panel .ogo-sec[open] .ogo-sec-brief { display: none; }
 #ogo-panel .ogo-sec-flag { padding: 1px 8px; border-radius: 99px; color: #fff; background: #a85f3a; font-size: 11px; }
 #ogo-panel .ogo-sec-flag.next { color: #8a5f12; background: #f7ecd2; }
+#ogo-panel .ogo-sec-pin { display: block; margin: 8px 0 0 auto; border: 1px solid #ddc9b1; border-radius: 8px; padding: 3px 8px; color: #765541; background: #fff; font-size: 11px; }
 #ogo-panel .ogo-loc-guide-tag { padding: 1px 6px; border-radius: 99px; color: #704739; background: #f5e8dd; font-size: 10px; }
 #ogo-panel .ogo-loc-general { margin-top: 12px; color: #765541; font-size: 12px; }
 #ogo-panel .ogo-loc-general summary { margin-bottom: 8px; cursor: pointer; }

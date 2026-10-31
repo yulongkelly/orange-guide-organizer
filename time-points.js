@@ -170,6 +170,37 @@
     return { level: "normal", note };
   }
 
+  // Keywords let a guide follow any game's own clock: a heading such as "## 暑假第一周 [第1周]" matches when the game shows 第1周.
+  // Numerals are normalized on both sides, so 第一周 equals 第1周, and 十一月 never counts as 一月.
+  const normalizeKeyword = (value) => String(value || "").normalize("NFKC").replace(/\s+/g, "").replace(/[零〇一二三四五六七八九十百]+/g, (m) => parseCn(m) ?? m);
+  const expandKeyword = (item) => {
+    const range = normalizeKeyword(item).match(/^(\D*)(\d+)[-~至到](\d+)(.*)$/);
+    if (!range) return [normalizeKeyword(item)];
+    const [, before, from, to, after] = range;
+    if (Number(to) < Number(from) || Number(to) - Number(from) > 60) return [normalizeKeyword(item)];
+    return Array.from({ length: Number(to) - Number(from) + 1 }, (_, i) => `${before}${Number(from) + i}${after}`);
+  };
+  // "暑假第四周 [第4-8周|暑假]" -> title 暑假第四周, keywords 第4周…第8周, 暑假
+  function parseHeadingKeywords(heading) {
+    const match = String(heading || "").match(/^(.*?)\s*\[([^[\]]+)\]\s*$/);
+    if (!match) return { title: String(heading || ""), keywords: [] };
+    const keywords = [...new Set(match[2].split(/[|｜]/).flatMap(expandKeyword).filter(Boolean))];
+    return { title: match[1] || match[2], keywords };
+  }
+  // Which keywords appear in a short on-screen label. Long text is dialogue, which may merely mention a date.
+  function findKeywords(text, keywords) {
+    const value = normalizeKeyword(text);
+    if (!value || value.length > 40) return [];
+    return keywords.filter((keyword) => {
+      for (let at = value.indexOf(keyword); at >= 0; at = value.indexOf(keyword, at + 1)) {
+        const startsOnNumber = /^\d/.test(keyword) && /\d/.test(value[at - 1] || "");
+        const endsOnNumber = /\d$/.test(keyword) && /\d/.test(value[at + keyword.length] || "");
+        if (!startsOnNumber && !endsOnNumber) return true;
+      }
+      return false;
+    });
+  }
+
   const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
   const LIST_ITEM = /^\s*(?:\d+\s*[、.)）]|[-*•]\s|[一二三四五六七八九十]+、)/;
   const summarize = (points) => {
@@ -193,26 +224,33 @@
     const finish = (draft) => {
       const body = draft.lines.join("\n").replace(/\s+$/, "");
       if (!body.trim()) return;
-      const section = { kind: draft.points.length ? "time" : "general", title: draft.title, text: body, points: draft.points, months: [], years: [], order: 0, stage: "" };
-      if (section.kind === "time") Object.assign(section, summarize(draft.points));
+      const keywords = draft.keywords || [];
+      const section = { kind: draft.points.length || keywords.length ? "time" : "general", title: draft.title, text: body, points: draft.points, keywords, months: [], years: [], order: 0, stage: "" };
+      if (draft.points.length) Object.assign(section, summarize(draft.points));
       sections.push(section);
     };
-    const hasTimedHeading = options.headings !== false && lines.some((line) => HEADING.test(line) && parseTimePoints(HEADING.exec(line)[2]).length);
-    if (hasTimedHeading) {
+    const headingIsTimed = (line) => {
+      const heading = HEADING.exec(line);
+      return Boolean(heading) && (parseTimePoints(heading[2]).length > 0 || parseHeadingKeywords(heading[2]).keywords.length > 0);
+    };
+    if (options.headings !== false && lines.some(headingIsTimed)) {
       let draft = { title: "开头", level: 0, points: [], lines: [] };
       for (const line of lines) {
         const heading = HEADING.exec(line);
         if (heading) {
           const level = heading[1].length;
+          const { title, keywords } = parseHeadingKeywords(heading[2]);
           const points = parseTimePoints(line).filter((p) => p.start >= line.indexOf(heading[2]));
-          const timed = points.length > 0;
+          const timed = points.length > 0 || keywords.length > 0;
           // A sub-heading without a time stays inside the timed section above it.
-          if (!timed && draft.points.length && level > draft.level) { draft.lines.push(line); continue; }
+          if (!timed && (draft.points.length || draft.keywords?.length) && level > draft.level) { draft.lines.push(line); continue; }
           finish(draft);
-          draft = { title: heading[2], level, points, lines: [line] };
+          draft = { title, level, points, keywords, lines: [line] };
         } else draft.lines.push(line);
       }
       finish(draft);
+      // A game's own clock has no calendar order, so guides that use keywords keep the author's order.
+      if (sections.some((section) => section.keywords.length)) sections.forEach((section, index) => { section.order = index; });
       return sections;
     }
     const blocks = [];
@@ -244,7 +282,7 @@
     return best;
   }
 
-  const api = { parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn };
+  const api = { parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

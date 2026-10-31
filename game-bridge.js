@@ -46,6 +46,21 @@
   const rolling = createRolling();
   const state = { calendar: "", year: null, month: null, stage: "" };
   let lastSent = "";
+  // Keywords come from the guides the player selected. Only those that appear on screen are reported, never the text around them.
+  const { findKeywords } = window.OgoTimePoints;
+  let keywords = [];
+  let lastKeywords = "";
+  let lastValue = "";
+  // Labels already on screen are not drawn again, so keep a few to check when the keyword list arrives. They stay in this frame.
+  const recentLabels = [];
+  let lastPieces = "";
+  const rememberLabel = (value) => {
+    if (typeof value !== "string" || !value.trim() || value.length > 40) return;
+    const seen = recentLabels.indexOf(value);
+    if (seen >= 0) recentLabels.splice(seen, 1);
+    recentLabels.push(value);
+    if (recentLabels.length > 60) recentLabels.shift();
+  };
 
   const trustedOrigin = (origin) => /^https:\/\/(?:www\.)?66rpg\.com$/.test(origin);
   const targetOrigin = () => {
@@ -68,13 +83,44 @@
     send({ type: "ogo-game-time", calendar: state.calendar, year: state.year, month: state.month, stage: state.stage, at: Date.now() });
   };
 
+  const publishKeywords = (found) => {
+    const signature = found.join("|");
+    if (!found.length || signature === lastKeywords) return;
+    lastKeywords = signature;
+    send({ type: "ogo-game-keywords-found", keywords: found, at: Date.now() });
+  };
+
   const inspect = (value) => {
+    if (value === lastValue) return;
+    lastValue = value;
+    rememberLabel(value);
     inspectText(value, state);
     // Pieces drawn one after another: match the date in the rolling buffer (only the matched date is used).
-    const joined = matchPrefixedDate(rolling(value, Date.now()));
+    const recent = rolling(value, Date.now());
+    if (value.length <= 3) lastPieces = recent;
+    const joined = matchPrefixedDate(recent);
     if (joined) inspectText(joined, state);
     publish();
+    if (keywords.length) {
+      const direct = value.length <= 60 ? findKeywords(value, keywords) : [];
+      publishKeywords(direct.length ? direct : findKeywords(recent, keywords));
+    }
   };
+
+  window.addEventListener("message", (event) => {
+    if ((event.source !== window.parent && event.source !== window.top) || !trustedOrigin(event.origin)) return;
+    const list = event.data?.type === "ogo-game-keywords" ? event.data.keywords : null;
+    if (!Array.isArray(list) || !list.every((item) => typeof item === "string" && item.length <= 40)) return;
+    keywords = list.slice(0, 500);
+    lastKeywords = "";
+    lastValue = "";
+    const fromPieces = findKeywords(lastPieces, keywords);
+    if (fromPieces.length) publishKeywords(fromPieces);
+    else for (let i = recentLabels.length - 1; i >= 0; i--) {
+      const found = findKeywords(recentLabels[i], keywords);
+      if (found.length) { publishKeywords(found); break; }
+    }
+  });
 
   const textsOf = (self, args) => {
     const out = [];
@@ -122,4 +168,5 @@
     const timer = setInterval(() => { if (install()) clearInterval(timer); }, 300);
     setTimeout(() => clearInterval(timer), 180000);
   }
+  send({ type: "ogo-bridge-ready" });
 })();
