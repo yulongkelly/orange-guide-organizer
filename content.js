@@ -359,6 +359,9 @@
   let adjustOpen = false;
   let guidesOpen = false;
   const secOpen = new Map();
+  // Inline editor state; only one guide section (or one whole guide) is edited at a time.
+  let editing = null;
+  let generalOpen = false;
   const mdApi = globalThis.OgoMarkdown;
   const bulkApi = globalThis.OgoBulkFavorite;
   let consentGranted = false;
@@ -460,21 +463,13 @@
     render();
   };
 
-  const sectionCache = new Map();
+  const sectionCache = timeApi.createTextCache();
   // Only imported .md files are rendered as Markdown; comments, pasted text and .txt files stay plain text.
   const isMd = (guide) => (guide.format ? guide.format === "md" : guide.source === "file");
-  const authorCache = new Map();
-  const authorsOf = (guide) => {
-    const key = `${guide.id}:${guide.text.length}`;
-    if (!authorCache.has(key)) authorCache.set(key, mdApi.collectAuthors(guide.text));
-    return authorCache.get(key);
-  };
+  const authorCache = timeApi.createTextCache();
+  const authorsOf = (guide) => authorCache.get(guide.id, guide.text, "", () => mdApi.collectAuthors(guide.text));
   const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text, { authors: authorsOf(guide) }) : mdApi.renderPlain(text));
-  const sectionsOf = (guide) => {
-    const key = `${guide.id}:${guide.text.length}:${isMd(guide)}`;
-    if (!sectionCache.has(key)) sectionCache.set(key, timeApi.splitGuideSections(guide.text, { headings: isMd(guide) }));
-    return sectionCache.get(key);
-  };
+  const sectionsOf = (guide) => sectionCache.get(guide.id, guide.text, isMd(guide), () => timeApi.splitGuideSections(guide.text, { headings: isMd(guide) }));
   const newGuideId = () => `g${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   const guessStage = (...texts) => GAME_STAGES.find((stage) => texts.some((t) => String(t || "").includes(stage.replace(/期$/, "")))) || "";
   async function addGuide(name, text, source, format = "text") {
@@ -497,7 +492,10 @@
   const startsWithHeading = (e) => isMd(e.guide) && /^#{1,6}\s/.test(e.section.text);
   const bodyOf = (e) => (startsWithHeading(e) ? e.section.text.replace(/^#{1,6}\s+.*\n?/, "") : e.section.text);
   const sectionKey = (guide, index) => `${guide.id}:${index}`;
+  const editorHtml = () => `<div class="ogo-edit" data-edit-box><textarea data-edit-ta spellcheck="false" aria-label="攻略原文（Markdown）"></textarea><small class="ogo-edit-error" data-edit-status role="alert" hidden></small><div class="ogo-edit-prompt" data-edit-prompt hidden><span>有未保存的改动。</span><span><button data-edit-prompt-save>保存</button><button data-edit-prompt-discard>放弃改动</button><button data-edit-prompt-stay>继续编辑</button></span></div><div class="ogo-edit-bar"><small>保存后无法撤销</small><span><button data-edit-cancel>取消</button><button data-edit-save>保存</button></span></div></div>`;
   function renderLocate() {
+    // Rebuilding the results would drop the textarea's focus, caret and unsaved text, so it waits until editing ends (saving or cancelling renders again).
+    if (editing?.ta && results.contains(editing.ta)) return;
     const base = currentGameTime();
     const shown = base && previewOffset ? shiftTime(base, previewOffset) : base;
     const manual = gameTimeManual || {};
@@ -530,23 +528,33 @@
       const isNow = e.ahead === 0;
       const isNext = !isNow && nextEntries.includes(e);
       const title = startsWithHeading(e) || e.section.kind === "general" ? e.section.title : monthsLabel(e.section);
-      const open = secOpen.has(e.key) ? secOpen.get(e.key) : isNow;
+      const editingHere = editing?.mode === "section" && editing.key === e.key;
+      const open = editingHere || (secOpen.has(e.key) ? secOpen.get(e.key) : isNow);
       const flag = isNow ? `<span class="ogo-sec-flag now">当前</span>` : isNext ? `<span class="ogo-sec-flag next">接下来${e.ahead ? ` · ${e.ahead} 个月后` : ""}</span>` : "";
-      return `<details class="ogo-sec ${isNow ? "now" : ""}" data-sec-key="${escapeHtml(e.key)}" data-default="${isNow ? 1 : 0}" ${open ? "open" : ""} ${isNow || (isNext && !nowEntries.length) ? "data-loc-anchor" : ""}><summary><span class="ogo-sec-title">${escapeHtml(title)}</span>${flag}${many ? `<span class="ogo-loc-guide-tag">${escapeHtml(e.guide.name)}</span>` : ""}<span class="ogo-sec-brief">${escapeHtml((isMd(e.guide) ? mdApi.summarizeMarkdown : mdApi.summarizePlain)(bodyOf(e)))}</span></summary><button class="ogo-sec-pin" data-loc-pin="${escapeHtml(e.key)}">${e.key === pinnedSection ? "取消手动定位" : "设为当前"}</button><div class="ogo-md">${renderGuideText(e.guide, bodyOf(e))}</div></details>`;
+      return `<details class="ogo-sec ${isNow ? "now" : ""}" data-sec-key="${escapeHtml(e.key)}" data-default="${isNow ? 1 : 0}" ${open ? "open" : ""} ${isNow || (isNext && !nowEntries.length) ? "data-loc-anchor" : ""}><summary><span class="ogo-sec-title">${escapeHtml(title)}</span>${flag}${many ? `<span class="ogo-loc-guide-tag">${escapeHtml(e.guide.name)}</span>` : ""}<span class="ogo-sec-brief">${escapeHtml((isMd(e.guide) ? mdApi.summarizeMarkdown : mdApi.summarizePlain)(bodyOf(e)))}</span></summary>${editingHere ? editorHtml() : `<div class="ogo-sec-tools">${e.section.start != null ? `<button class="ogo-sec-pin" data-loc-edit="${escapeHtml(e.key)}">编辑</button>` : ""}<button class="ogo-sec-pin" data-loc-pin="${escapeHtml(e.key)}">${e.key === pinnedSection ? "取消手动定位" : "设为当前"}</button></div><div class="ogo-md">${renderGuideText(e.guide, bodyOf(e))}</div>`}</details>`;
     };
     const guideRow = (g) => {
       const timedCount = sectionsOf(g).filter((s) => s.kind === "time").length;
-      return `<div class="ogo-loc-guide"><label class="ogo-loc-pick"><input type="checkbox" data-loc-toggle="${escapeHtml(g.id)}" ${g.enabled ? "checked" : ""}/><b>${escapeHtml(g.name)}</b></label><div class="ogo-loc-guide-actions"><small>${timedCount ? `${timedCount} 段` : "无时间点"}</small><select data-loc-stage="${escapeHtml(g.id)}" aria-label="适用境界"><option value="">境界不限</option>${GAME_STAGES.map((s) => `<option ${g.stage === s ? "selected" : ""}>${s}</option>`).join("")}</select><button data-loc-only="${escapeHtml(g.id)}">只用这份</button><button data-loc-view="${escapeHtml(g.id)}">${expandedGuides.has(g.id) ? "收起全文" : "全文"}</button><button data-loc-rename="${escapeHtml(g.id)}">改名</button><button data-loc-delete="${escapeHtml(g.id)}">删除</button></div>${expandedGuides.has(g.id) ? `<div class="ogo-md ogo-loc-full">${renderGuideText(g, g.text)}</div>` : ""}</div>`;
+      return `<div class="ogo-loc-guide"><label class="ogo-loc-pick"><input type="checkbox" data-loc-toggle="${escapeHtml(g.id)}" ${g.enabled ? "checked" : ""}/><b>${escapeHtml(g.name)}</b></label><div class="ogo-loc-guide-actions"><small>${timedCount ? `${timedCount} 段` : "无时间点"}</small><select data-loc-stage="${escapeHtml(g.id)}" aria-label="适用境界"><option value="">境界不限</option>${GAME_STAGES.map((s) => `<option ${g.stage === s ? "selected" : ""}>${s}</option>`).join("")}</select><button data-loc-only="${escapeHtml(g.id)}">只用这份</button><button data-loc-view="${escapeHtml(g.id)}">${expandedGuides.has(g.id) ? "收起全文" : "全文"}</button><button data-loc-export="${escapeHtml(g.id)}">导出</button><button data-loc-rename="${escapeHtml(g.id)}">改名</button><button data-loc-delete="${escapeHtml(g.id)}">删除</button></div>${editing?.mode === "full" && editing.guideId === g.id ? editorHtml() : expandedGuides.has(g.id) ? `<div class="ogo-loc-fulltools"><button data-loc-edit-full="${escapeHtml(g.id)}">编辑全文</button></div><div class="ogo-md ogo-loc-full">${renderGuideText(g, g.text)}</div>` : ""}</div>`;
     };
     let body;
     if (!guides.length) body = `<div class="ogo-empty">还没有定位用的攻略。<br>点上方“导入 .md/.txt”或“粘贴文字”，也可以在攻略或收藏卡片上点“加入定位”。<br>想要清晰的标题和分节，请导入 .md 文件。</div>`;
     else if (!selected.length) body = `<div class="ogo-empty">没有选中任何攻略。勾选上方的攻略后，才会按游戏时间定位。</div>`;
     else if (!timed.length) body = `<div class="ogo-empty">选中的攻略里没有识别到时间。导入 .md 文件时，可以在标题末尾写上游戏里显示的文字，比如“## 暑假第一周 [第1周]”。</div>`;
     else body = `<div class="ogo-loc-toolbar"><button data-loc-jump>回到当前位置</button><span><button data-loc-fold="open">全部展开</button><button data-loc-fold="closed">全部折叠</button></span></div>${!shown && !positionLabel ? `<div class="ogo-loc-hint">还没有读取到游戏时间。可以打开游戏，或展开任意一节点“设为当前”。</div>` : !nowEntries.length ? `<div class="ogo-loc-hint">${escapeHtml(positionLabel || formatLongTime(shown))}没有对应的内容。</div>` : ""}<div class="ogo-sec-list">${timed.map(card).join("")}</div>`;
-    if (selected.length && general.length) body += `<details class="ogo-loc-general"><summary>通用内容（${general.length} 段，不按时间定位）</summary>${general.map(card).join("")}</details>`;
+    if (selected.length && general.length) body += `<details class="ogo-loc-general" data-general ${generalOpen || (editing?.mode === "section" && general.some((e) => e.key === editing.key)) ? "open" : ""}><summary>通用内容（${general.length} 段，不按时间定位）</summary>${general.map(card).join("")}</details>`;
 
     const keepScroll = results.scrollTop;
     results.innerHTML = `<div class="ogo-loc-top"><div class="ogo-loc-now-line"><strong>${positionLabel ? escapeHtml(positionLabel) : base ? escapeHtml(formatLongTime(previewOffset && shown ? shown : base)) : "未读取游戏时间"}</strong><span>${pinnedTitle ? "· 手动定位" : markerLabel ? "· 自动读取" : previewOffset ? "· 预览" : base ? (usingRead ? "· 自动读取" : "· 手动") : ""}</span></div><small class="${(!base && !positionLabel) || stale ? "ogo-time-stale" : ""}">${lastReadAt ? `更新于 ${when}${stale ? "，可能已过期；打开游戏状态页可刷新" : ""}` : "游戏显示时间后自动读取，也可手动输入"}</small><details class="ogo-loc-adjust" data-adjust ${adjustOpen ? "open" : ""}><summary>调整时间 / 预览</summary><div class="ogo-time-manual"><input type="number" min="0" max="999" data-time-year placeholder="年" value="${manual.year ?? ""}" aria-label="手动输入年"/><input type="number" min="1" max="12" data-time-month placeholder="月" value="${manual.month ?? ""}" aria-label="手动输入月"/><button data-action="time-save">设定</button><button data-action="time-clear">清除手动值</button></div><label class="ogo-loc-follow"><input type="checkbox" data-loc-follow ${followGame ? "checked" : ""}/>跟随游戏时间（关闭后使用手动值）</label><div class="ogo-loc-preview"><button data-loc-shift="-1">‹ 上一月</button><span>${previewOffset && shown ? `预览 ${escapeHtml(formatLongTime(shown))}` : "预览：当前"}</span><button data-loc-shift="1">下一月 ›</button><button data-loc-shift="0" ${previewOffset ? "" : "disabled"}>还原</button></div></details></div><details class="ogo-loc-guides" data-guides ${guidesOpen ? "open" : ""}><summary>攻略 ${guides.length} 份 · 已选 ${selected.length}</summary><div class="ogo-loc-head"><span>${locateMessage ? `<small class="ogo-loc-message">${escapeHtml(locateMessage)}</small>` : ""}</span><span><button data-loc-import>导入 .md/.txt</button><button data-loc-paste>粘贴文字</button></span></div>${stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("")}${guides.map(guideRow).join("")}</details>${stageWarnings.length && !guidesOpen ? stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("") : ""}${body}`;
+    if (editing && !editing.ta) {
+      const ta = results.querySelector("[data-edit-ta]");
+      if (ta) {
+        editing.ta = ta;
+        editing.status = results.querySelector("[data-edit-status]");
+        ta.value = editing.original;
+        ta.focus({ preventScroll: true });
+      } else editing = null;
+    }
     const anchorKey = `${shown ? `${shown.year}-${shown.month}` : ""}|${positionLabel}|${selected.map((g) => g.id).join(",")}`;
     const anchor = results.querySelector("[data-loc-anchor]");
     if (anchorKey !== lastLocateKey && !locateUserScrolled && anchor) {
@@ -772,7 +780,12 @@
     }
   }
 
-  launcher.addEventListener("click", () => panel.classList.toggle("open"));
+  launcher.addEventListener("click", () => {
+    const toggle = () => panel.classList.toggle("open");
+    if (!editing) toggle();
+    else if (editDirty()) askLeave(toggle);
+    else leaveEdit(toggle);
+  });
   panel.addEventListener("click", async (event) => {
     const close = event.target.closest('[data-action="close"]');
     if (close) panel.classList.remove("open");
@@ -954,6 +967,105 @@
     }
   });
   const findGuide = (id) => guides.find((g) => g.id === id);
+  const setEditStatus = (text) => {
+    const el = editing?.status;
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = !text;
+  };
+  const editDirty = () => Boolean(editing?.ta) && timeApi.normalizeNewlines(editing.ta.value) !== editing.saved;
+  // Writes the textarea back into the guide (section edits only replace that section's range). On failure the guide is rolled back and the textarea keeps its text.
+  async function persistEdit(e) {
+    const g = findGuide(e.guideId);
+    if (!g) return true;
+    const value = timeApi.normalizeNewlines(e.ta.value);
+    if (value === e.saved) return true;
+    if (e.mode === "full" && !value.trim()) { setEditStatus("攻略不能为空，未保存；文字仍保留在框内。"); return false; }
+    let next;
+    try { next = timeApi.replaceRange(g.text, e.start, e.end, value); } catch { setEditStatus("找不到这一节在原文里的位置，未保存；文字仍保留在框内。"); return false; }
+    if (next.length > 200000) { setEditStatus("攻略超过 20 万字，未保存；文字仍保留在框内。"); return false; }
+    const previous = g.text;
+    g.text = next;
+    if (!(await saveLocate())) {
+      g.text = previous;
+      const reason = locateMessage;
+      locateMessage = "";
+      setEditStatus(`${reason || "保存失败"}。文字仍保留在框内，请先复制备份。`);
+      return false;
+    }
+    e.end = e.start + value.length;
+    e.saved = value;
+    setEditStatus("");
+    return true;
+  }
+  // Section indexes (secOpen / pinnedSection keys) shift when an edit adds, removes or retitles sections, so move them to where the same section now sits.
+  function remapEditedKeys(g, e) {
+    const map = e.mode === "full" ? e.oldSections.map(() => -1) : timeApi.remapSectionIndexes(e.oldSections, sectionsOf(g), { start: e.start, oldEnd: e.origEnd, newEnd: e.end });
+    const prefix = `${g.id}:`;
+    const moved = (key) => { const j = map[Number(key.slice(prefix.length))]; return j >= 0 ? `${prefix}${j}` : ""; };
+    const opens = [...secOpen].filter(([key]) => key.startsWith(prefix));
+    for (const [key] of opens) secOpen.delete(key);
+    for (const [key, value] of opens) { const next = moved(key); if (next) secOpen.set(next, value); }
+    if (pinnedSection.startsWith(prefix)) {
+      const next = moved(pinnedSection);
+      if (next !== pinnedSection) { pinnedSection = next; saveGameTime(); }
+    }
+  }
+  // "保存": writes the text, leaves edit mode and re-renders (which also sends changed keywords to the game). Stays in edit mode if saving failed.
+  // `then(changed)` runs after the edit state is cleared and before the re-render, so a click that was waiting for the edit to end still finds its target.
+  async function saveEdit(then) {
+    const e = editing;
+    if (!e?.ta) return true;
+    if (!(await (e.chain = e.chain.then(() => persistEdit(e)).catch(() => false)))) return false;
+    const g = findGuide(e.guideId);
+    const changed = e.saved !== e.original;
+    if (g && changed) remapEditedKeys(g, e);
+    editing = null;
+    then?.(changed);
+    render();
+    return true;
+  }
+  // "取消": drops the textarea's text; the saved guide is untouched.
+  function leaveEdit(then) {
+    editing = null;
+    then?.(false);
+    render();
+  }
+  function askLeave(then) {
+    const prompt = editing.ta.closest("[data-edit-box]").querySelector("[data-edit-prompt]");
+    editing.pending = then;
+    prompt.hidden = false;
+    prompt.scrollIntoView({ block: "nearest" });
+  }
+  function beginEdit(g, mode, key, index) {
+    if (editing) return;
+    g.text = timeApi.normalizeNewlines(g.text);
+    const sections = sectionsOf(g);
+    let start = 0;
+    let end = g.text.length;
+    if (mode === "section") {
+      const section = sections[index];
+      if (!section || section.start == null) return;
+      ({ start, end } = section);
+      secOpen.set(key, true);
+    } else expandedGuides.add(g.id);
+    const original = g.text.slice(start, end);
+    editing = { guideId: g.id, mode, key, start, end, origEnd: end, original, saved: original, oldSections: sections.map(({ start: s, end: e }) => ({ start: s, end: e })), ta: null, status: null, pending: null, chain: Promise.resolve(true) };
+    render();
+  }
+  // Clicking anything outside the editor can't silently lose text: without changes the editor just closes, with changes the in-panel prompt asks first.
+  // The click is then replayed (dropped if the sections it pointed at may have moved).
+  panel.addEventListener("click", (event) => {
+    if (!editing || event.target.closest("[data-edit-box]")) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const target = event.target;
+    const replay = (changed) => { if (target.isConnected && !(changed && target.closest("[data-sec-key],[data-loc-edit],[data-loc-pin]"))) target.click(); };
+    if (editDirty()) askLeave(replay);
+    else leaveEdit(replay);
+  }, true);
+  panel.addEventListener("keydown", (event) => { if (event.key === "Escape" && editing?.ta && event.target === editing.ta) event.stopPropagation(); });
+  window.addEventListener("beforeunload", (event) => { if (editDirty()) { event.preventDefault(); event.returnValue = ""; } });
   results.addEventListener("scroll", () => { if (activeTopic === "定位" && Date.now() > ignoreScrollUntil) locateUserScrolled = true; });
   panel.addEventListener("change", async (event) => {
     const t = event.target;
@@ -1027,6 +1139,27 @@
     }
     const only = idOf("data-loc-only");
     if (only) { for (const g of guides) g.enabled = g.id === only; await saveLocate(); render(); }
+    const edit = idOf("data-loc-edit");
+    if (edit) {
+      const g = findGuide(edit.split(":")[0]);
+      if (g) beginEdit(g, "section", edit, Number(edit.split(":")[1]));
+    }
+    const editFull = idOf("data-loc-edit-full");
+    if (editFull) { const g = findGuide(editFull); if (g) beginEdit(g, "full", "", 0); }
+    if (target.closest("[data-edit-save]")) await saveEdit();
+    if (target.closest("[data-edit-cancel]")) leaveEdit();
+    if (target.closest("[data-edit-prompt-save]")) { const then = editing?.pending; await saveEdit(then); }
+    if (target.closest("[data-edit-prompt-discard]")) leaveEdit(editing?.pending);
+    if (target.closest("[data-edit-prompt-stay]") && editing) { editing.pending = null; editing.ta.closest("[data-edit-box]").querySelector("[data-edit-prompt]").hidden = true; editing.ta.focus(); }
+    const exp = idOf("data-loc-export");
+    if (exp) {
+      const g = findGuide(exp);
+      if (g) {
+        downloadText(`${safeFilename(g.name)}.${isMd(g) ? "md" : "txt"}`, g.text, isMd(g) ? "text/markdown" : "text/plain");
+        locateMessage = `已导出“${g.name}”。`;
+        render();
+      }
+    }
     const view = idOf("data-loc-view");
     if (view) { if (expandedGuides.has(view)) expandedGuides.delete(view); else expandedGuides.add(view); render(); }
     const rename = idOf("data-loc-rename");
@@ -1061,6 +1194,7 @@
     if (el.matches?.("[data-sec-key]")) { if (el.open === (el.dataset.default === "1")) secOpen.delete(el.dataset.secKey); else secOpen.set(el.dataset.secKey, el.open); }
     else if (el.matches?.("[data-adjust]")) adjustOpen = el.open;
     else if (el.matches?.("[data-guides]")) guidesOpen = el.open;
+    else if (el.matches?.("[data-general]")) generalOpen = el.open;
   }, true);
   window.addEventListener("message", acceptGameTimeMessage);
   setInterval(() => { if (activeTopic === "定位" && document.activeElement?.tagName !== "INPUT") render(); }, 60000);
