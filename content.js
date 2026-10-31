@@ -463,7 +463,13 @@
   const sectionCache = new Map();
   // Only imported .md files are rendered as Markdown; comments, pasted text and .txt files stay plain text.
   const isMd = (guide) => (guide.format ? guide.format === "md" : guide.source === "file");
-  const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text) : mdApi.renderPlain(text));
+  const authorCache = new Map();
+  const authorsOf = (guide) => {
+    const key = `${guide.id}:${guide.text.length}`;
+    if (!authorCache.has(key)) authorCache.set(key, mdApi.collectAuthors(guide.text));
+    return authorCache.get(key);
+  };
+  const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text, { authors: authorsOf(guide) }) : mdApi.renderPlain(text));
   const sectionsOf = (guide) => {
     const key = `${guide.id}:${guide.text.length}:${isMd(guide)}`;
     if (!sectionCache.has(key)) sectionCache.set(key, timeApi.splitGuideSections(guide.text, { headings: isMd(guide) }));
