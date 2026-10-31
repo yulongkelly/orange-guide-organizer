@@ -225,7 +225,9 @@
       const body = draft.lines.join("\n").replace(/\s+$/, "");
       if (!body.trim()) return;
       const keywords = draft.keywords || [];
-      const section = { kind: draft.points.length || keywords.length ? "time" : "general", title: draft.title, text: body, points: draft.points, keywords, months: [], years: [], order: 0, stage: "" };
+      const start = draft.start ?? null;
+      // start/end are offsets of section.text inside the newline-normalized guide text (end excludes the trimmed trailing whitespace).
+      const section = { kind: draft.points.length || keywords.length ? "time" : "general", title: draft.title, text: body, start, end: start == null ? null : start + body.length, points: draft.points, keywords, months: [], years: [], order: 0, stage: "" };
       if (draft.points.length) Object.assign(section, summarize(draft.points));
       sections.push(section);
     };
@@ -234,8 +236,11 @@
       return Boolean(heading) && (parseTimePoints(heading[2]).length > 0 || parseHeadingKeywords(heading[2]).keywords.length > 0);
     };
     if (options.headings !== false && lines.some(headingIsTimed)) {
-      let draft = { title: "开头", level: 0, points: [], lines: [] };
+      let draft = { title: "开头", level: 0, points: [], lines: [], start: 0 };
+      let offset = 0;
       for (const line of lines) {
+        const lineStart = offset;
+        offset += line.length + 1;
         const heading = HEADING.exec(line);
         if (heading) {
           const level = heading[1].length;
@@ -245,7 +250,7 @@
           // A sub-heading without a time stays inside the timed section above it.
           if (!timed && (draft.points.length || draft.keywords?.length) && level > draft.level) { draft.lines.push(line); continue; }
           finish(draft);
-          draft = { title, level, points, keywords, lines: [line] };
+          draft = { title, level, points, keywords, lines: [line], start: lineStart };
         } else draft.lines.push(line);
       }
       finish(draft);
@@ -255,19 +260,25 @@
     }
     const blocks = [];
     let block = [];
-    const flush = () => { if (block.length) blocks.push(block.join("\n")); block = []; };
+    let blockStart = 0;
+    let offset = 0;
+    const flush = () => { if (block.length) blocks.push({ body: block.join("\n"), start: blockStart }); block = []; };
     for (const line of lines) {
+      const lineStart = offset;
+      offset += line.length + 1;
       if (!line.trim()) { flush(); continue; }
       if (LIST_ITEM.test(line)) flush();
+      if (!block.length) blockStart = lineStart;
       block.push(line);
     }
     flush();
     const general = [];
-    for (const body of blocks) {
+    for (const { body, start } of blocks) {
       const points = parseTimePoints(body);
       if (!points.length) { general.push(body); continue; }
-      finish({ title: body.split("\n")[0].replace(/^\s*(?:[-*•]\s*|\d+\s*[、.)）]\s*)/, "").slice(0, 24), points, lines: [body] });
+      finish({ title: body.split("\n")[0].replace(/^\s*(?:[-*•]\s*|\d+\s*[、.)）]\s*)/, "").slice(0, 24), points, lines: [body], start });
     }
+    // The merged "通用" section is stitched from separate blocks, so it has no single range in the original text (start/end stay null).
     if (general.length) finish({ title: "通用", points: [], lines: [general.join("\n\n")] });
     return sections;
   }
@@ -282,7 +293,42 @@
     return best;
   }
 
-  const api = { parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords };
+  const normalizeNewlines = (value) => String(value || "").replace(/\r\n?/g, "\n");
+  // Put `replacement` where section.start..section.end sat in the guide text. Everything outside that range (including the blank lines
+  // between sections) is copied unchanged; identical sections are told apart by position, never by searching for their text.
+  function replaceRange(input, start, end, replacement) {
+    const text = normalizeNewlines(input);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > text.length) throw new RangeError("范围不在攻略文字内");
+    return text.slice(0, start) + normalizeNewlines(replacement) + text.slice(end);
+  }
+  // For each old section, the index of the same section after the text range change.start..change.oldEnd became change.start..change.newEnd, or -1 when it cannot be told.
+  function remapSectionIndexes(oldSections, newSections, change) {
+    const delta = change.newEnd - change.oldEnd;
+    return oldSections.map((old) => {
+      if (old.start == null) return -1;
+      let target;
+      if (old.end <= change.start) target = old.start;
+      else if (old.start >= change.oldEnd) target = old.start + delta;
+      else if (old.start === change.start) target = change.start;
+      else return -1;
+      return newSections.findIndex((section) => section.start === target);
+    });
+  }
+  // Remembers a value per id and reuses it only while the exact same text (and variant) comes back; same-length edits never hit a stale entry.
+  function createTextCache() {
+    const entries = new Map();
+    return {
+      get(id, text, variant, compute) {
+        const hit = entries.get(id);
+        if (hit && hit.text === text && hit.variant === variant) return hit.value;
+        const value = compute();
+        entries.set(id, { text, variant, value });
+        return value;
+      }
+    };
+  }
+
+  const api = { normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
