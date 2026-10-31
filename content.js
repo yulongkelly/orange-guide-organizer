@@ -195,23 +195,49 @@
     for (let i = 0; i < source.length; i++) hash = Math.imul(hash ^ source.charCodeAt(i), 16777619);
     return `c${(hash >>> 0).toString(16)}`;
   };
+  // The interaction section's box, counters and tabs sit above the first comment in the same container.
+  const stripPageHeader = (raw) => String(raw || "").replace(/\r/g, "").replace(/^\s*互动区[\s\S]*?只看作者[ \t]*\n(?:\s*(?:全部精选|作者的话|攻略区|精彩长评|安利墙|其他)+[ \t]*(?:\n|$))*/, "");
+  // Every comment ends with its “分享 举报” actions, so several of those in one node mean several comments.
+  const splitCommentBlocks = (raw) => {
+    const value = String(raw || "").replace(/\r/g, "");
+    const ending = /分享(?:\s+\S{1,8}){0,6}?\s+举报[ \t]*(?=\n|$)/g;
+    const blocks = [];
+    let start = 0;
+    for (const match of value.matchAll(ending)) {
+      const end = match.index + match[0].length;
+      blocks.push(value.slice(start, end));
+      start = end;
+    }
+    return blocks.length > 1 ? blocks.map((block) => block.trim()).filter(Boolean) : [value];
+  };
   const findComments = () => {
     const nodes = [...document.querySelectorAll(selectors)];
     const seen = new Set();
     const found = [];
+    const add = (node, text, raw, scope) => {
+      if (text.length < 25 || !guideSignal.test(text)) return;
+      const key = text.slice(0, 180);
+      if (seen.has(key)) return;
+      seen.add(key);
+      found.push({ node, text, raw, scope });
+    };
     for (const node of nodes) {
       const raw = node.innerText || node.textContent || "";
       const text = formatCommentText(raw);
-      if (text.length < 25 || text.length > 5000 || !guideSignal.test(text)) continue;
+      if (text.length < 25 || !guideSignal.test(text)) continue;
       const childMatch = [...node.children].some((child) => {
         const childText = clean(child.innerText || child.textContent);
         return childText.length >= 25 && childText.length <= text.length * 0.92 && guideSignal.test(childText);
       });
       if (childMatch) continue;
-      const key = text.slice(0, 180);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      found.push({ node, text, raw });
+      const body = stripPageHeader(raw);
+      const blocks = splitCommentBlocks(body);
+      if (blocks.length === 1 && body === raw.replace(/\r/g, "")) { add(node, text, raw, node); continue; }
+      for (const block of blocks) {
+        const scope = document.createElement("div");
+        scope.textContent = block;
+        add(node, formatCommentText(block), block, scope);
+      }
     }
     return found;
   };
@@ -275,9 +301,9 @@
     return null;
   };
 
-  const recordsOnCurrentPage = () => findComments().map(({ node, text, raw }, index) => {
+  const recordsOnCurrentPage = () => findComments().map(({ node, text, raw, scope }, index) => {
     const header = getHeader(raw, text);
-    return { node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(node, raw), flowers: getFlowerCount(node), key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle() };
+    return { node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(scope, raw), flowers: getFlowerCount(scope), key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle() };
   });
 
   const panel = document.createElement("aside");
@@ -286,7 +312,7 @@
     <header><div><strong>攻略整理器</strong><small>评论收藏保存在本机</small></div><button data-action="close" aria-label="关闭">×</button></header>
     <section class="ogo-consent" data-consent role="dialog" aria-labelledby="ogo-consent-title" aria-modal="true" hidden><h2 id="ogo-consent-title">使用前请了解数据处理方式</h2><p>整理攻略需要读取当前橙光作品页中已加载的评论文字，以及页面展示的作者、作品、日期、赞数和花数。点击“抓取全部页”后，扩展会逐页切换评论分页并读取各页评论。数据只在本机浏览器中用于搜索、筛选、排序和定位。</p><p>只有点击“收藏”后，评论和相关信息才会保存到 Chrome 扩展本地存储；导出也只在你主动操作时生成文件。扩展不向开发者或云端上传评论，也不读取登录凭据或 Cookie。“定位攻略”中加入、导入或粘贴的文字只保存在本机；游戏时间功能只读取游戏画面上显示的年月和境界文字，不读取其他游戏内容，也不会上传。</p><p>你可以选择暂不使用。若之后要停止处理，可卸载扩展；卸载可能删除本机收藏，请先导出备份。<a href="https://www.66rpg.com/" target="_blank" rel="noreferrer">仅在橙光作品页运行</a></p><div class="ogo-consent-actions"><button data-action="decline-consent">暂不使用</button><button data-action="accept-consent">同意并开始</button></div></section>
     <div class="ogo-toolbar"><input data-search placeholder="搜攻略内容 / 角色名"/><select data-sort aria-label="排序方式"><option value="page">页面顺序</option><option value="likes-desc">赞数从高到低</option><option value="likes-asc">赞数从低到高</option></select><button data-action="scan">重新扫描</button></div>
-    <div class="ogo-bulk-toolbar"><button data-action="scan-all-pages">抓取全部页</button><small data-bulk-status>自动逐页收集评论，可随时停止</small></div>
+    <div class="ogo-bulk-toolbar"><button data-action="scan-all-pages">抓取全部页</button><button data-action="fav-all" disabled>全部收藏（0）</button><button data-action="fav-undo" hidden>撤销</button><small data-bulk-status>自动逐页收集评论，可随时停止</small></div>
     <div class="ogo-flower-filter"><span>总花数</span><input type="number" min="0" data-flower-min placeholder="最低" aria-label="最低总花数"/><span>至</span><input type="number" min="0" data-flower-max placeholder="最高" aria-label="最高总花数"/><button data-action="clear-flower-filter">清除</button></div>
     <nav data-topics></nav><div class="ogo-folder-nav" data-folder-nav hidden></div><div class="ogo-fav-tools" data-fav-tools hidden><button data-action="select-all">全选当前列表</button><button data-action="folder-create" disabled>新建文件夹（0）</button><button data-action="folder-delete" hidden>删除文件夹</button><button data-action="export-selected" disabled>导出所选</button><button data-action="export-all">导出全部</button><button data-action="choose-import">导入 JSON</button><input data-import-file type="file" accept=".json,application/json" hidden></div><div class="ogo-status" data-status>正在扫描页面…</div><main data-results></main>
     <input data-loc-file type="file" accept=".md,.txt,text/markdown,text/plain" hidden><section class="ogo-folder-dialog" data-paste-dialog hidden><div class="ogo-folder-head"><strong>粘贴攻略</strong><button data-action="close-paste">×</button></div><p>粘贴的文字按纯文本显示。想要清晰的标题和分节，请导入 .md 文件。只保存在本机，不影响收藏。</p><input data-paste-name placeholder="攻略名称，例如：凡人期攻略"/><textarea data-paste-text rows="8" placeholder="在这里粘贴攻略文字"></textarea><div class="ogo-folder-actions"><button data-action="close-paste">取消</button><button data-action="confirm-paste">保存</button></div></section><section class="ogo-folder-dialog" data-folder-dialog hidden><div class="ogo-folder-head"><strong>新建文件夹</strong><button data-action="close-folder">×</button></div><p>选中的收藏会放进文件夹，每条评论仍单独保留。</p><input data-folder-name placeholder="文件夹名称，例如：灵兽收集攻略"/><div class="ogo-folder-actions"><button data-action="close-folder">取消</button><button data-action="confirm-folder">创建</button></div></section>
@@ -318,6 +344,10 @@
   const STALE_AFTER = 10 * 60 * 1000;
   let gameTimeRead = null;
   let gameTimeManual = null;
+  let gameMarker = null;
+  let pinnedSection = "";
+  let bridge = null;
+  let sentKeywords = "";
   let guides = [];
   let followGame = true;
   let previewOffset = 0;
@@ -330,10 +360,13 @@
   let guidesOpen = false;
   const secOpen = new Map();
   const mdApi = globalThis.OgoMarkdown;
+  const bulkApi = globalThis.OgoBulkFavorite;
   let consentGranted = false;
   let bulkScanRunning = false;
   let bulkStopRequested = false;
   let bulkStatusMessage = "";
+  let visibleItems = [];
+  let lastBulkKeys = null;
   let activeBulkCollected = null;
   let ignorePaginationMutationsUntil = 0;
   const status = panel.querySelector("[data-status]");
@@ -349,11 +382,15 @@
   const pasteDialog = panel.querySelector("[data-paste-dialog]");
   const loadFavorites = () => new Promise((resolve) => chrome.storage.local.get({ ogoFavorites: {}, ogoFolders: {} }, (data) => { favorites = data.ogoFavorites || {}; folders = data.ogoFolders || {}; resolve(); }));
   const saveFavorites = () => new Promise((resolve) => chrome.storage.local.set({ ogoFavorites: favorites }, resolve));
+  // Like saveFavorites, but resolves false when storage rejects the write (e.g. quota exceeded).
+  const trySaveFavorites = () => new Promise((resolve) => chrome.storage.local.set({ ogoFavorites: favorites }, () => resolve(!chrome.runtime.lastError)));
   const saveFolders = () => new Promise((resolve) => chrome.storage.local.set({ ogoFolders: folders }, resolve));
   const loadGameTime = () => new Promise((resolve) => chrome.storage.local.get({ ogoGameTimeV1: {}, [`ogoLocate:${workId}`]: null }, (data) => {
     const saved = data.ogoGameTimeV1?.[workId];
     gameTimeRead = saved?.read || null;
     gameTimeManual = saved?.manual || null;
+    gameMarker = saved?.marker || null;
+    pinnedSection = saved?.pinned || "";
     const locate = data[`ogoLocate:${workId}`];
     guides = Array.isArray(locate?.guides) ? locate.guides.filter((g) => g && typeof g.id === "string" && typeof g.text === "string") : [];
     followGame = locate?.follow !== false;
@@ -361,7 +398,7 @@
   }));
   const saveGameTime = () => new Promise((resolve) => chrome.storage.local.get({ ogoGameTimeV1: {} }, (data) => {
     const all = data.ogoGameTimeV1 || {};
-    all[workId] = { read: gameTimeRead, manual: gameTimeManual };
+    all[workId] = { read: gameTimeRead, manual: gameTimeManual, marker: gameMarker, pinned: pinnedSection };
     chrome.storage.local.set({ ogoGameTimeV1: all }, () => { if (chrome.runtime.lastError) locateMessage = `保存游戏时间失败：${chrome.runtime.lastError.message}`; resolve(); });
   }));
   const saveLocate = () => new Promise((resolve) => chrome.storage.local.set({ [`ogoLocate:${workId}`]: { guides, follow: followGame } }, () => {
@@ -391,9 +428,31 @@
     }
     return false;
   };
+  const activeKeywords = () => [...new Set(guides.filter((g) => g.enabled).flatMap((g) => sectionsOf(g).flatMap((s) => s.keywords)))];
+  // The game frame reports only these keywords, so it needs the current list whenever the selected guides change.
+  const syncKeywords = (force = false) => {
+    const target = bridge?.source || gameFrame()?.contentWindow;
+    if (!target) return;
+    const list = activeKeywords();
+    const signature = JSON.stringify(list);
+    if (!force && signature === sentKeywords) return;
+    sentKeywords = signature;
+    try { target.postMessage({ type: "ogo-game-keywords", keywords: list }, bridge?.origin || location.origin); } catch {}
+  };
   const acceptGameTimeMessage = (event) => {
     const d = event.data;
-    if (!d || d.type !== "ogo-game-time" || !fromGameFrame(event)) return;
+    if (!d || !fromGameFrame(event)) return;
+    if (d.type === "ogo-bridge-ready") { bridge = { source: event.source, origin: event.origin }; syncKeywords(true); return; }
+    if (d.type === "ogo-game-keywords-found") {
+      const known = activeKeywords();
+      if (!Array.isArray(d.keywords) || !d.keywords.length || !d.keywords.every((k) => known.includes(k))) return;
+      gameMarker = { keywords: d.keywords, at: Date.now() };
+      pinnedSection = "";
+      saveGameTime();
+      render();
+      return;
+    }
+    if (d.type !== "ogo-game-time") return;
     const intIn = (v, lo, hi) => v === null || (Number.isInteger(v) && v >= lo && v <= hi);
     if (!["", "庆和", "修炼"].includes(d.calendar) || !intIn(d.year, 0, 999) || !intIn(d.month, 1, 12) || d.month === null || !(d.stage === "" || GAME_STAGES.includes(d.stage))) return;
     gameTimeRead = { calendar: d.calendar, year: d.year, month: d.month, stage: d.stage, at: Date.now() };
@@ -404,7 +463,13 @@
   const sectionCache = new Map();
   // Only imported .md files are rendered as Markdown; comments, pasted text and .txt files stay plain text.
   const isMd = (guide) => (guide.format ? guide.format === "md" : guide.source === "file");
-  const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text) : mdApi.renderPlain(text));
+  const authorCache = new Map();
+  const authorsOf = (guide) => {
+    const key = `${guide.id}:${guide.text.length}`;
+    if (!authorCache.has(key)) authorCache.set(key, mdApi.collectAuthors(guide.text));
+    return authorCache.get(key);
+  };
+  const renderGuideText = (guide, text) => (isMd(guide) ? mdApi.renderMarkdown(text, { authors: authorsOf(guide) }) : mdApi.renderPlain(text));
   const sectionsOf = (guide) => {
     const key = `${guide.id}:${guide.text.length}:${isMd(guide)}`;
     if (!sectionCache.has(key)) sectionCache.set(key, timeApi.splitGuideSections(guide.text, { headings: isMd(guide) }));
@@ -439,24 +504,35 @@
     const usingRead = followGame && readTime();
     const selected = guides.filter((g) => g.enabled);
     const entries = [];
-    for (const guide of selected) sectionsOf(guide).forEach((section, index) => entries.push({ guide, section, key: sectionKey(guide, index), ahead: shown && section.kind === "time" ? timeApi.sectionAhead(section, shown) : null }));
+    const marker = gameMarker?.keywords || [];
+    const aheadOf = (section, key) => {
+      if (pinnedSection) return key === pinnedSection ? 0 : null;
+      if (section.keywords.length) return section.keywords.some((k) => marker.includes(k)) ? 0 : null;
+      return shown && section.kind === "time" ? timeApi.sectionAhead(section, shown) : null;
+    };
+    for (const guide of selected) sectionsOf(guide).forEach((section, index) => { const key = sectionKey(guide, index); entries.push({ guide, section, key, ahead: aheadOf(section, key) }); });
     const timed = entries.filter((e) => e.section.kind === "time").sort((a, b) => a.section.order - b.section.order);
     const general = entries.filter((e) => e.section.kind === "general");
     const nextAhead = Math.min(...timed.filter((e) => e.ahead != null && e.ahead > 0).map((e) => e.ahead));
     const nowEntries = timed.filter((e) => e.ahead === 0);
-    const nextEntries = Number.isFinite(nextAhead) ? timed.filter((e) => e.ahead === nextAhead) : [];
+    const afterNow = timed[timed.lastIndexOf(nowEntries[nowEntries.length - 1]) + 1];
+    const nextEntries = Number.isFinite(nextAhead) ? timed.filter((e) => e.ahead === nextAhead) : nowEntries.length && afterNow ? [afterNow] : [];
+    const pinnedTitle = entries.find((e) => e.key === pinnedSection)?.section.title || "";
+    const markerLabel = [...marker].sort((a, b) => b.length - a.length)[0] || "";
+    const positionLabel = pinnedTitle || markerLabel;
     const many = selected.length > 1;
     const stageWarnings = selected.filter((g) => g.stage && base?.stage && g.stage !== base.stage).map((g) => `当前已是${base.stage}，“${g.name}”标注为${g.stage}攻略（仅提示，不会自动切换）。`);
-    const stale = gameTimeRead && Date.now() - gameTimeRead.at > STALE_AFTER;
-    const when = gameTimeRead ? new Date(gameTimeRead.at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "";
+    const lastReadAt = Math.max(gameTimeRead?.at || 0, gameMarker?.at || 0);
+    const stale = lastReadAt && Date.now() - lastReadAt > STALE_AFTER;
+    const when = lastReadAt ? new Date(lastReadAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }) : "";
 
     const card = (e) => {
       const isNow = e.ahead === 0;
       const isNext = !isNow && nextEntries.includes(e);
       const title = startsWithHeading(e) || e.section.kind === "general" ? e.section.title : monthsLabel(e.section);
       const open = secOpen.has(e.key) ? secOpen.get(e.key) : isNow;
-      const flag = isNow ? `<span class="ogo-sec-flag now">当前</span>` : isNext ? `<span class="ogo-sec-flag next">接下来 · ${e.ahead} 个月后</span>` : "";
-      return `<details class="ogo-sec ${isNow ? "now" : ""}" data-sec-key="${escapeHtml(e.key)}" data-default="${isNow ? 1 : 0}" ${open ? "open" : ""} ${isNow || (isNext && !nowEntries.length) ? "data-loc-anchor" : ""}><summary><span class="ogo-sec-title">${escapeHtml(title)}</span>${flag}${many ? `<span class="ogo-loc-guide-tag">${escapeHtml(e.guide.name)}</span>` : ""}<span class="ogo-sec-brief">${escapeHtml((isMd(e.guide) ? mdApi.summarizeMarkdown : mdApi.summarizePlain)(bodyOf(e)))}</span></summary><div class="ogo-md">${renderGuideText(e.guide, bodyOf(e))}</div></details>`;
+      const flag = isNow ? `<span class="ogo-sec-flag now">当前</span>` : isNext ? `<span class="ogo-sec-flag next">接下来${e.ahead ? ` · ${e.ahead} 个月后` : ""}</span>` : "";
+      return `<details class="ogo-sec ${isNow ? "now" : ""}" data-sec-key="${escapeHtml(e.key)}" data-default="${isNow ? 1 : 0}" ${open ? "open" : ""} ${isNow || (isNext && !nowEntries.length) ? "data-loc-anchor" : ""}><summary><span class="ogo-sec-title">${escapeHtml(title)}</span>${flag}${many ? `<span class="ogo-loc-guide-tag">${escapeHtml(e.guide.name)}</span>` : ""}<span class="ogo-sec-brief">${escapeHtml((isMd(e.guide) ? mdApi.summarizeMarkdown : mdApi.summarizePlain)(bodyOf(e)))}</span></summary><button class="ogo-sec-pin" data-loc-pin="${escapeHtml(e.key)}">${e.key === pinnedSection ? "取消手动定位" : "设为当前"}</button><div class="ogo-md">${renderGuideText(e.guide, bodyOf(e))}</div></details>`;
     };
     const guideRow = (g) => {
       const timedCount = sectionsOf(g).filter((s) => s.kind === "time").length;
@@ -465,13 +541,13 @@
     let body;
     if (!guides.length) body = `<div class="ogo-empty">还没有定位用的攻略。<br>点上方“导入 .md/.txt”或“粘贴文字”，也可以在攻略或收藏卡片上点“加入定位”。<br>想要清晰的标题和分节，请导入 .md 文件。</div>`;
     else if (!selected.length) body = `<div class="ogo-empty">没有选中任何攻略。勾选上方的攻略后，才会按游戏时间定位。</div>`;
-    else if (!timed.length) body = `<div class="ogo-empty">选中的攻略里没有识别到月份或年份，无法定位。可以点“全文”查看原文。</div>`;
-    else body = `<div class="ogo-loc-toolbar"><button data-loc-jump>回到当前位置</button><span><button data-loc-fold="open">全部展开</button><button data-loc-fold="closed">全部折叠</button></span></div>${!shown ? `<div class="ogo-loc-hint">还没有当前游戏时间，读取到或手动输入后会标出当前位置。</div>` : !nowEntries.length ? `<div class="ogo-loc-hint">${escapeHtml(formatLongTime(shown))}没有对应的内容。</div>` : ""}<div class="ogo-sec-list">${timed.map(card).join("")}</div>`;
+    else if (!timed.length) body = `<div class="ogo-empty">选中的攻略里没有识别到时间。导入 .md 文件时，可以在标题末尾写上游戏里显示的文字，比如“## 暑假第一周 [第1周]”。</div>`;
+    else body = `<div class="ogo-loc-toolbar"><button data-loc-jump>回到当前位置</button><span><button data-loc-fold="open">全部展开</button><button data-loc-fold="closed">全部折叠</button></span></div>${!shown && !positionLabel ? `<div class="ogo-loc-hint">还没有读取到游戏时间。可以打开游戏，或展开任意一节点“设为当前”。</div>` : !nowEntries.length ? `<div class="ogo-loc-hint">${escapeHtml(positionLabel || formatLongTime(shown))}没有对应的内容。</div>` : ""}<div class="ogo-sec-list">${timed.map(card).join("")}</div>`;
     if (selected.length && general.length) body += `<details class="ogo-loc-general"><summary>通用内容（${general.length} 段，不按时间定位）</summary>${general.map(card).join("")}</details>`;
 
     const keepScroll = results.scrollTop;
-    results.innerHTML = `<div class="ogo-loc-top"><div class="ogo-loc-now-line"><strong>${base ? escapeHtml(formatLongTime(previewOffset && shown ? shown : base)) : "未读取游戏时间"}</strong><span>${previewOffset ? "· 预览" : base ? (usingRead ? "· 自动读取" : "· 手动") : ""}</span></div><small class="${!base || stale ? "ogo-time-stale" : ""}">${gameTimeRead ? `更新于 ${when}${stale ? "，可能已过期；打开游戏状态页可刷新" : ""}` : "打开游戏状态页后自动读取，也可手动输入"}</small><details class="ogo-loc-adjust" data-adjust ${adjustOpen ? "open" : ""}><summary>调整时间 / 预览</summary><div class="ogo-time-manual"><input type="number" min="0" max="999" data-time-year placeholder="年" value="${manual.year ?? ""}" aria-label="手动输入年"/><input type="number" min="1" max="12" data-time-month placeholder="月" value="${manual.month ?? ""}" aria-label="手动输入月"/><button data-action="time-save">设定</button><button data-action="time-clear">清除手动值</button></div><label class="ogo-loc-follow"><input type="checkbox" data-loc-follow ${followGame ? "checked" : ""}/>跟随游戏时间（关闭后使用手动值）</label><div class="ogo-loc-preview"><button data-loc-shift="-1">‹ 上一月</button><span>${previewOffset && shown ? `预览 ${escapeHtml(formatLongTime(shown))}` : "预览：当前"}</span><button data-loc-shift="1">下一月 ›</button><button data-loc-shift="0" ${previewOffset ? "" : "disabled"}>还原</button></div></details></div><details class="ogo-loc-guides" data-guides ${guidesOpen ? "open" : ""}><summary>攻略 ${guides.length} 份 · 已选 ${selected.length}</summary><div class="ogo-loc-head"><span>${locateMessage ? `<small class="ogo-loc-message">${escapeHtml(locateMessage)}</small>` : ""}</span><span><button data-loc-import>导入 .md/.txt</button><button data-loc-paste>粘贴文字</button></span></div>${stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("")}${guides.map(guideRow).join("")}</details>${stageWarnings.length && !guidesOpen ? stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("") : ""}${body}`;
-    const anchorKey = `${shown ? `${shown.year}-${shown.month}` : ""}|${selected.map((g) => g.id).join(",")}`;
+    results.innerHTML = `<div class="ogo-loc-top"><div class="ogo-loc-now-line"><strong>${positionLabel ? escapeHtml(positionLabel) : base ? escapeHtml(formatLongTime(previewOffset && shown ? shown : base)) : "未读取游戏时间"}</strong><span>${pinnedTitle ? "· 手动定位" : markerLabel ? "· 自动读取" : previewOffset ? "· 预览" : base ? (usingRead ? "· 自动读取" : "· 手动") : ""}</span></div><small class="${(!base && !positionLabel) || stale ? "ogo-time-stale" : ""}">${lastReadAt ? `更新于 ${when}${stale ? "，可能已过期；打开游戏状态页可刷新" : ""}` : "游戏显示时间后自动读取，也可手动输入"}</small><details class="ogo-loc-adjust" data-adjust ${adjustOpen ? "open" : ""}><summary>调整时间 / 预览</summary><div class="ogo-time-manual"><input type="number" min="0" max="999" data-time-year placeholder="年" value="${manual.year ?? ""}" aria-label="手动输入年"/><input type="number" min="1" max="12" data-time-month placeholder="月" value="${manual.month ?? ""}" aria-label="手动输入月"/><button data-action="time-save">设定</button><button data-action="time-clear">清除手动值</button></div><label class="ogo-loc-follow"><input type="checkbox" data-loc-follow ${followGame ? "checked" : ""}/>跟随游戏时间（关闭后使用手动值）</label><div class="ogo-loc-preview"><button data-loc-shift="-1">‹ 上一月</button><span>${previewOffset && shown ? `预览 ${escapeHtml(formatLongTime(shown))}` : "预览：当前"}</span><button data-loc-shift="1">下一月 ›</button><button data-loc-shift="0" ${previewOffset ? "" : "disabled"}>还原</button></div></details></div><details class="ogo-loc-guides" data-guides ${guidesOpen ? "open" : ""}><summary>攻略 ${guides.length} 份 · 已选 ${selected.length}</summary><div class="ogo-loc-head"><span>${locateMessage ? `<small class="ogo-loc-message">${escapeHtml(locateMessage)}</small>` : ""}</span><span><button data-loc-import>导入 .md/.txt</button><button data-loc-paste>粘贴文字</button></span></div>${stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("")}${guides.map(guideRow).join("")}</details>${stageWarnings.length && !guidesOpen ? stageWarnings.map((w) => `<small class="ogo-loc-warn">${escapeHtml(w)}</small>`).join("") : ""}${body}`;
+    const anchorKey = `${shown ? `${shown.year}-${shown.month}` : ""}|${positionLabel}|${selected.map((g) => g.id).join(",")}`;
     const anchor = results.querySelector("[data-loc-anchor]");
     if (anchorKey !== lastLocateKey && !locateUserScrolled && anchor) {
       lastLocateKey = anchorKey;
@@ -487,7 +563,8 @@
   }
 
   function render() {
-    const topicsFound = ["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
+    syncKeywords();
+    const topicsFound =["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
     topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : topic === "定位" && guides.length ? ` ${guides.length}` : ""}</button>`).join("");
     folderNav.hidden = activeTopic !== "收藏";
     folderNav.innerHTML = `<button class="${activeFolderId === null ? "active" : ""}" data-folder-filter="">全部收藏</button>` + Object.values(folders).map((folder) => {
@@ -528,6 +605,13 @@
     createFolderButton.textContent = `新建文件夹（${selectedVisibleCount}）`;
     createFolderButton.disabled = selectedVisibleCount === 0;
     favoriteTools.querySelector('[data-action="export-selected"]').disabled = selectedVisibleCount === 0;
+    visibleItems = activeTopic === "收藏" ? [] : items;
+    const favAllButton = panel.querySelector('[data-action="fav-all"]');
+    const unsavedCount = bulkApi.pickUnsaved(visibleItems, favorites, makeKey).length;
+    favAllButton.textContent = `全部收藏（${unsavedCount}）`;
+    favAllButton.hidden = activeTopic === "收藏";
+    favAllButton.disabled = bulkScanRunning || unsavedCount === 0;
+    panel.querySelector('[data-action="fav-undo"]').hidden = !lastBulkKeys || activeTopic === "收藏";
     const bulkButton = panel.querySelector('[data-action="scan-all-pages"]');
     bulkButton.textContent = bulkScanRunning ? "停止抓取" : "抓取全部页";
     panel.querySelector("[data-bulk-status]").textContent = bulkScanRunning ? bulkStatusMessage : "自动逐页收集评论，可随时停止";
@@ -560,9 +644,24 @@
     if (!items.length) results.innerHTML = `<div class="ogo-empty">${activeTopic === "收藏" ? (activeFolderId ? "这个文件夹还没有评论。" : "还没有收藏。看到喜欢的攻略评论，点它旁边的“☆ 收藏”即可。") : records.length ? "没有符合搜索条件的评论。" : "还没找到攻略评论。先展开“全部互动”，再滚动加载评论后点重新扫描。"}</div>`;
   }
 
+  // Single storage write; on failure the in-memory favorites roll back so the UI never shows unsaved stars.
+  async function applyBulkFavorites(nextFavorites, keys, message, undoKeys) {
+    const previous = favorites;
+    favorites = nextFavorites;
+    if (await trySaveFavorites()) {
+      lastBulkKeys = undoKeys;
+      bulkStatusMessage = message;
+    } else {
+      favorites = previous;
+      bulkStatusMessage = "保存失败（可能超过存储空间），未做任何更改";
+    }
+    render();
+  }
+
   function scan() {
     if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) return;
     bulkStatusMessage = "";
+    lastBulkKeys = null;
     records = recordsOnCurrentPage();
     let migratedTitle = false;
     for (const favorite of Object.values(favorites)) {
@@ -801,9 +900,18 @@
         for (const folder of Object.values(folders)) folder.items = (folder.items || []).filter((itemKey) => itemKey !== key);
         await saveFolders();
       }
-      else if (record) favorites[key] = { key, text: record.text, author: record.author, flowerLine: record.flowerLine, postedAt: record.postedAt, topic: record.topic, likes: record.likes, flowers: record.flowers, url: record.url, workTitle: record.workTitle, savedAt: Date.now() };
+      else if (record) favorites[key] = bulkApi.toFavorite(key, record, Date.now());
       await saveFavorites();
       render();
+    }
+    if (event.target.closest('[data-action="fav-all"]') && !bulkScanRunning && activeTopic !== "收藏") {
+      const { next, addedKeys } = bulkApi.mergeFavorites(favorites, bulkApi.pickUnsaved(visibleItems, favorites, makeKey), Date.now());
+      if (addedKeys.length) await applyBulkFavorites(next, addedKeys, `已收藏 ${addedKeys.length} 条`, addedKeys);
+    }
+    if (event.target.closest('[data-action="fav-undo"]') && lastBulkKeys) {
+      const keys = lastBulkKeys.filter((key) => favorites[key]);
+      for (const key of keys) selectedFavorites.delete(key);
+      await applyBulkFavorites(bulkApi.removeKeys(favorites, keys), keys, `已撤销 ${keys.length} 条收藏`, null);
     }
     const jump = event.target.closest("[data-jump]");
     if (jump) {
@@ -894,6 +1002,13 @@
     if (target.closest("[data-loc-shift]")) {
       const delta = Number(idOf("data-loc-shift"));
       previewOffset = delta === 0 ? 0 : previewOffset + delta;
+      render();
+    }
+    const pin = idOf("data-loc-pin");
+    if (pin) {
+      pinnedSection = pin === pinnedSection ? "" : pin;
+      locateUserScrolled = false;
+      await saveGameTime();
       render();
     }
     if (target.closest("[data-loc-jump]")) {

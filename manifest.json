@@ -7,13 +7,13 @@
   "content_scripts": [
     {
       "matches": ["https://www.66rpg.com/game/*"],
-      "js": ["time-points.js", "markdown.js", "content.js"],
+      "js": ["time-points.js", "markdown.js", "bulk-favorite.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://www.66rpg.com/h5/*", "https://66rpg.com/h5/*"],
-      "js": ["game-bridge.js"],
+      "js": ["time-points.js", "game-bridge.js"],
       "run_at": "document_start",
       "all_frames": true,
       "world": "MAIN"
