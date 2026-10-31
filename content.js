@@ -516,7 +516,7 @@
     const afterNow = timed[timed.lastIndexOf(nowEntries[nowEntries.length - 1]) + 1];
     const nextEntries = Number.isFinite(nextAhead) ? timed.filter((e) => e.ahead === nextAhead) : nowEntries.length && afterNow ? [afterNow] : [];
     const pinnedTitle = entries.find((e) => e.key === pinnedSection)?.section.title || "";
-    const markerLabel = [...marker].sort((a, b) => b.length - a.length)[0] || "";
+    const markerLabel = marker.map(timeApi.keywordLabel).sort((a, b) => b.length - a.length)[0] || "";
     const positionLabel = pinnedTitle || markerLabel;
     const many = selected.length > 1;
     const stageWarnings = selected.filter((g) => g.stage && base?.stage && g.stage !== base.stage).map((g) => `当前已是${base.stage}，“${g.name}”标注为${g.stage}攻略（仅提示，不会自动切换）。`);

@@ -34,6 +34,13 @@ test("findKeywords：数字边界", () => {
   assert.deepEqual(findKeywords("十一月", ["一月"].map(normalizeKeyword)), []);
 });
 
+test("findKeywords：!月 排除紧跟月份的周数", () => {
+  assert.deepEqual(parseHeadingKeywords("暑假 [第4-5周!月]").keywords, ["第4周!月", "第5周!月"]);
+  assert.deepEqual(findKeywords("第1周 周一 晨", ["第1周!月"]), ["第1周!月"]);
+  assert.deepEqual(findKeywords("9月 第1周 6:00", ["第1周!月", "9月"]), ["9月"]);
+  assert.deepEqual(findKeywords("九月第一周", ["第1周!月", "9月"]), ["9月"]);
+});
+
 test("findKeywords：长对话不算", () => {
   const dialogue = "老师说下学期的比赛报名要在第1周之前交上来，大家回家以后都要和父母好好商量一下再决定";
   assert.deepEqual(findKeywords(dialogue, ["第1周"]), []);

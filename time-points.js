@@ -187,15 +187,19 @@
     const keywords = [...new Set(match[2].split(/[|｜]/).flatMap(expandKeyword).filter(Boolean))];
     return { title: match[1] || match[2], keywords };
   }
+  // "第1周!月" is 第1周 unless 月 comes right before it, so it matches 第1周 周一 but not 9月 第1周.
+  const keywordLabel = (keyword) => keyword.split("!")[0];
   // Which keywords appear in a short on-screen label. Long text is dialogue, which may merely mention a date.
   function findKeywords(text, keywords) {
     const value = normalizeKeyword(text);
     if (!value || value.length > 40) return [];
     return keywords.filter((keyword) => {
-      for (let at = value.indexOf(keyword); at >= 0; at = value.indexOf(keyword, at + 1)) {
-        const startsOnNumber = /^\d/.test(keyword) && /\d/.test(value[at - 1] || "");
-        const endsOnNumber = /\d$/.test(keyword) && /\d/.test(value[at + keyword.length] || "");
-        if (!startsOnNumber && !endsOnNumber) return true;
+      const [word, notAfter] = keyword.split("!");
+      for (let at = value.indexOf(word); at >= 0; at = value.indexOf(word, at + 1)) {
+        const startsOnNumber = /^\d/.test(word) && /\d/.test(value[at - 1] || "");
+        const endsOnNumber = /\d$/.test(word) && /\d/.test(value[at + word.length] || "");
+        const excluded = notAfter && value.slice(Math.max(0, at - notAfter.length), at) === notAfter;
+        if (!startsOnNumber && !endsOnNumber && !excluded) return true;
       }
       return false;
     });
@@ -328,7 +332,7 @@
     };
   }
 
-  const api = { normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords };
+  const api = { normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, keywordLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);
