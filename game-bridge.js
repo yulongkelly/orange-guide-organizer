@@ -40,7 +40,21 @@
   };
   const matchPrefixedDate = (text) => text.match(PREFIXED_DATE)?.[0] || "";
 
-  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate }; return; }
+  // Pure: some games bake 修炼/年/月 into a header image and only draw the numbers. Digits close together are one number;
+  // the header must hold exactly two numbers, year then month.
+  const headerDate = (fields) => {
+    const groups = [];
+    for (const field of [...fields].sort((a, b) => a.x - b.x)) {
+      const last = groups[groups.length - 1];
+      if (last && field.x - last.x <= 20) { last.text += field.text; last.x = field.x; }
+      else groups.push({ ...field });
+    }
+    if (groups.length !== 2) return null;
+    const [year, month] = groups.map((group) => Number(group.text));
+    return month >= 1 && month <= 12 ? { year, month } : null;
+  };
+
+  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate }; return; }
   if (window.__ogoGameBridge || window === window.top) return;
   window.__ogoGameBridge = true;
   const rolling = createRolling();
@@ -90,6 +104,27 @@
     send({ type: "ogo-game-keywords-found", keywords: found, at: Date.now() });
   };
 
+  // Header numbers are read only for guides keyed to 修炼N年, so other games' top-of-screen numbers are ignored.
+  const HEADER_MAX_Y = 15;
+  // Other numbers sit at the top left; the year and month are in the middle of the bar.
+  const HEADER_MIN_X = 300;
+  const headerFields = new Map();
+  const checkHeader = () => {
+    if (!keywords.some((keyword) => keyword.startsWith("修炼"))) return;
+    const date = headerDate([...headerFields.values()]);
+    if (date) publishKeywords(findKeywords(`修炼${date.year}年${date.month}月`, keywords));
+  };
+  const noteHeaderField = (field, value) => {
+    if (typeof value !== "string" || typeof field?.x !== "number" || typeof field.y !== "number" || field.y < 0 || field.y > HEADER_MAX_Y || field.x < HEADER_MIN_X) return;
+    const x = Math.round(field.x);
+    const now = Date.now();
+    // A number that grows a digit moves; digits left beside it from an earlier draw are stale.
+    for (const [key, entry] of headerFields) if (Math.abs(key - x) <= 20 && now - entry.at > 50) headerFields.delete(key);
+    if (/^\s*\d{1,3}\s*$/.test(value)) headerFields.set(x, { x, text: value.trim(), at: now });
+    else headerFields.delete(x);
+    checkHeader();
+  };
+
   const inspect = (value) => {
     if (value === lastValue) return;
     lastValue = value;
@@ -116,6 +151,7 @@
     keywords = list.slice(0, 500);
     lastKeywords = "";
     lastValue = "";
+    checkHeader();
     const fromPieces = findKeywords(lastPieces, keywords);
     if (fromPieces.length) publishKeywords(fromPieces);
     else for (let i = recentLabels.length - 1; i >= 0; i--) {
@@ -139,7 +175,12 @@
     const original = proto?.[name];
     if (typeof original !== "function" || original.__ogoWrapped) return;
     const wrapped = function (...args) {
-      try { for (const text of textsOf(this, args)) inspect(text); } catch {}
+      try {
+        for (const text of textsOf(this, args)) {
+          inspect(text);
+          if (owner === "TextField" && name === "buildBitmapFontText") noteHeaderField(this, text);
+        }
+      } catch {}
       return original.apply(this, args);
     };
     wrapped.__ogoWrapped = true;

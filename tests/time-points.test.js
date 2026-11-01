@@ -227,7 +227,15 @@ test("桥接：无前缀日期只认短文字开头，境界和单独月份", ()
   assert.deepEqual(state, before);
 });
 
-const { createRolling, matchPrefixedDate } = require("../game-bridge.js");
+const { createRolling, matchPrefixedDate, headerDate } = require("../game-bridge.js");
+test("headerDate：顶部两个数字依次是年和月", () => {
+  assert.deepEqual(headerDate([{ x: 530, text: "6" }, { x: 418, text: "0" }]), { year: 0, month: 6 });
+  assert.deepEqual(headerDate([{ x: 418, text: "1" }, { x: 433, text: "0" }, { x: 530, text: "3" }]), { year: 10, month: 3 });
+  assert.equal(headerDate([{ x: 530, text: "6" }]), null);
+  assert.equal(headerDate([{ x: 100, text: "1" }, { x: 300, text: "2" }, { x: 500, text: "3" }]), null);
+  assert.equal(headerDate([{ x: 418, text: "5" }, { x: 530, text: "13" }]), null);
+});
+
 test("桥接：逐段绘制的日期用滚动缓冲拼起来，停顿后清空", () => {
   const roll = createRolling();
   let now = 1000;
