@@ -442,6 +442,12 @@
     sentKeywords = signature;
     try { target.postMessage({ type: "ogo-game-keywords", keywords: list }, bridge?.origin || location.origin); } catch {}
   };
+  // Loading a save can change the reading many times a second, and the panel shares a thread with the game.
+  // Readings still apply at once; only saving and redrawing wait. Other tabs redraw when they are opened.
+  const gameTimeFlush = timeApi.createCoalescer(() => {
+    saveGameTime();
+    if (activeTopic === "定位") render();
+  }, 200);
   const acceptGameTimeMessage = (event) => {
     const d = event.data;
     if (!d || !fromGameFrame(event)) return;
@@ -449,18 +455,17 @@
     if (d.type === "ogo-game-keywords-found") {
       const known = activeKeywords();
       if (!Array.isArray(d.keywords) || !d.keywords.length || !d.keywords.every((k) => known.includes(k))) return;
+      if (!pinnedSection && d.keywords.join("|") === gameMarker?.keywords.join("|")) return;
       gameMarker = { keywords: d.keywords, at: Date.now() };
       pinnedSection = "";
-      saveGameTime();
-      render();
+      gameTimeFlush.request();
       return;
     }
     if (d.type !== "ogo-game-time") return;
     const intIn = (v, lo, hi) => v === null || (Number.isInteger(v) && v >= lo && v <= hi);
     if (!["", "庆和", "修炼"].includes(d.calendar) || !intIn(d.year, 0, 999) || !intIn(d.month, 1, 12) || d.month === null || !(d.stage === "" || GAME_STAGES.includes(d.stage))) return;
     gameTimeRead = { calendar: d.calendar, year: d.year, month: d.month, stage: d.stage, at: Date.now() };
-    saveGameTime();
-    render();
+    gameTimeFlush.request();
   };
 
   const sectionCache = timeApi.createTextCache();

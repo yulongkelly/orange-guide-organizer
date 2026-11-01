@@ -297,6 +297,18 @@
     return best;
   }
 
+  // Runs `run` once, `delay` ms after the first request, however many requests arrive in between. Later requests never push it back.
+  function createCoalescer(run, delay, timers = globalThis) {
+    let waiting = false;
+    return {
+      request() {
+        if (waiting) return;
+        waiting = true;
+        timers.setTimeout(() => { waiting = false; run(); }, delay);
+      }
+    };
+  }
+
   const normalizeNewlines = (value) => String(value || "").replace(/\r\n?/g, "\n");
   // Put `replacement` where section.start..section.end sat in the guide text. Everything outside that range (including the blank lines
   // between sections) is copied unchanged; identical sections are told apart by position, never by searching for their text.
@@ -332,7 +344,7 @@
     };
   }
 
-  const api = { normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, keywordLabel };
+  const api = { createCoalescer, normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, keywordLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

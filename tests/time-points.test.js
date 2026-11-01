@@ -251,3 +251,23 @@ test("切分：headings:false 时 # 不当作标题，只靠段落里的时间�
   assert.deepEqual(sections.map((s) => [s.kind, s.months.join(",")]), [["time", "1"], ["time", "5"], ["general", ""]]);
   assert.equal(sections.length, 3);
 });
+
+const { createCoalescer } = require("../time-points.js");
+test("createCoalescer：等待期间的请求合并，且不被持续请求推迟", () => {
+  const pending = [];
+  const timers = { setTimeout: (run, delay) => pending.push({ run, delay }) };
+  let runs = 0;
+  const flush = createCoalescer(() => { runs++; }, 200, timers);
+  flush.request();
+  flush.request();
+  flush.request();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].delay, 200);
+  assert.equal(runs, 0);
+  pending.shift().run();
+  assert.equal(runs, 1);
+  flush.request();
+  assert.equal(pending.length, 1);
+  pending.shift().run();
+  assert.equal(runs, 2);
+});
