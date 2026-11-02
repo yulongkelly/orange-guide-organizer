@@ -190,19 +190,35 @@
   // "第1周!月" is 第1周 unless 月 comes right before it, so it matches 第1周 周一 but not 9月 第1周.
   const keywordLabel = (keyword) => keyword.split("!")[0];
   // Which keywords appear in a short on-screen label. Long text is dialogue, which may merely mention a date.
-  function findKeywords(text, keywords) {
+  const prepareKeyword = (keyword) => { const [word, notAfter] = keyword.split("!"); return { word, notAfter }; };
+  const keywordHits = (value, { word, notAfter }) => {
+    for (let at = value.indexOf(word); at >= 0; at = value.indexOf(word, at + 1)) {
+      const startsOnNumber = /^\d/.test(word) && /\d/.test(value[at - 1] || "");
+      const endsOnNumber = /\d$/.test(word) && /\d/.test(value[at + word.length] || "");
+      const excluded = notAfter && value.slice(Math.max(0, at - notAfter.length), at) === notAfter;
+      if (!startsOnNumber && !endsOnNumber && !excluded) return true;
+    }
+    return false;
+  };
+  const matchPrepared = (text, keywords, prepared) => {
     const value = normalizeKeyword(text);
     if (!value || value.length > 40) return [];
-    return keywords.filter((keyword) => {
-      const [word, notAfter] = keyword.split("!");
-      for (let at = value.indexOf(word); at >= 0; at = value.indexOf(word, at + 1)) {
-        const startsOnNumber = /^\d/.test(word) && /\d/.test(value[at - 1] || "");
-        const endsOnNumber = /\d$/.test(word) && /\d/.test(value[at + word.length] || "");
-        const excluded = notAfter && value.slice(Math.max(0, at - notAfter.length), at) === notAfter;
-        if (!startsOnNumber && !endsOnNumber && !excluded) return true;
-      }
-      return false;
-    });
+    return keywords.filter((_, i) => keywordHits(value, prepared[i]));
+  };
+  function findKeywords(text, keywords) {
+    return matchPrepared(text, keywords, keywords.map(prepareKeyword));
+  }
+  // Same results as findKeywords(text, keywords), with the keyword split done once and answers cached by raw text. Returned arrays are shared: do not mutate.
+  function createKeywordMatcher(keywords, limit = 500) {
+    const prepared = keywords.map(prepareKeyword);
+    const cache = new Map();
+    return (text) => {
+      if (cache.has(text)) return cache.get(text);
+      const found = matchPrepared(text, keywords, prepared);
+      if (cache.size >= limit) cache.delete(cache.keys().next().value);
+      cache.set(text, found);
+      return found;
+    };
   }
 
   const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
@@ -344,7 +360,7 @@
     };
   }
 
-  const api = { createCoalescer, normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, keywordLabel };
+  const api = { createCoalescer, normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, createKeywordMatcher, keywordLabel };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

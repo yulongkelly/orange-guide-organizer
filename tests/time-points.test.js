@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parseTimePoints, classifyTimePoint, splitGuideSections, sectionAhead, parseCn } = require("../time-points.js");
+const { parseTimePoints, classifyTimePoint, splitGuideSections, sectionAhead, parseCn, findKeywords, createKeywordMatcher } = require("../time-points.js");
 
 const labels = (text) => parseTimePoints(text).map((p) => p.label);
 
@@ -270,4 +270,24 @@ test("createCoalescer：等待期间的请求合并，且不被持续请求推�
   assert.equal(pending.length, 1);
   pending.shift().run();
   assert.equal(runs, 2);
+});
+
+test("createKeywordMatcher：结果与 findKeywords 一致（含缓存命中）", () => {
+  const keywords = ["第1周", "第1周!月", "1月", "一月", "修炼8年3月", "银两", "第3周周2", "体力 80"].map((k) => k.normalize("NFKC"));
+  const texts = ["第1周 周一", "9月 第1周", "庆和22年11月", "庆和22年1月", "修炼8年3月", "银两 1200", "体力 80", "", "   ", "第3周 周二", "十一月", "x".repeat(41), "1月".padEnd(40, "x"), "第1周 周一"];
+  const match = createKeywordMatcher(keywords);
+  for (let round = 0; round < 2; round++) for (const text of texts) assert.deepEqual(match(text), findKeywords(text, keywords), text);
+  assert.equal(match("第1周 周一"), match("第1周 周一"));
+});
+
+test("createKeywordMatcher：空列表与超长文字", () => {
+  assert.deepEqual(createKeywordMatcher([])("第1周"), []);
+  assert.deepEqual(createKeywordMatcher(["第1周"])("第1周".padEnd(41, "x")), []);
+});
+
+test("createKeywordMatcher：超过上限后仍然正确", () => {
+  const keywords = ["1月", "2月", "3月"];
+  const match = createKeywordMatcher(keywords, 2);
+  const texts = ["1月", "2月", "3月", "1月", "2月", "3月", "12月", "1月"];
+  for (const text of texts) assert.deepEqual(match(text), findKeywords(text, keywords), text);
 });
