@@ -54,7 +54,16 @@
     return month >= 1 && month <= 12 ? { year, month } : null;
   };
 
-  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate }; return; }
+  // Pure: keep the last 60 short labels, oldest first. A label drawn again moves to the end.
+  const rememberIn = (labels, value) => {
+    if (typeof value !== "string" || !value.trim() || value.length > 40 || labels[labels.length - 1] === value) return;
+    const seen = labels.indexOf(value);
+    if (seen >= 0) labels.splice(seen, 1);
+    labels.push(value);
+    if (labels.length > 60) labels.shift();
+  };
+
+  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn }; return; }
   if (window.__ogoGameBridge || window === window.top) return;
   window.__ogoGameBridge = true;
   const rolling = createRolling();
@@ -70,13 +79,9 @@
   // Labels already on screen are not drawn again, so keep a few to check when the keyword list arrives. They stay in this frame.
   const recentLabels = [];
   let lastPieces = "";
-  const rememberLabel = (value) => {
-    if (typeof value !== "string" || !value.trim() || value.length > 40) return;
-    const seen = recentLabels.indexOf(value);
-    if (seen >= 0) recentLabels.splice(seen, 1);
-    recentLabels.push(value);
-    if (recentLabels.length > 60) recentLabels.shift();
-  };
+  const rememberLabel = (value) => rememberIn(recentLabels, value);
+  // Text is only checked while the 定位 tab is open. Until then labels are just remembered, and they are checked when it opens.
+  let watching = false;
 
   const trustedOrigin = (origin) => /^https:\/\/(?:www\.)?66rpg\.com$/.test(origin);
   const targetOrigin = () => {
@@ -124,7 +129,7 @@
     for (const [key, entry] of headerFields) if (Math.abs(key - x) <= 20 && now - entry.at > 50) headerFields.delete(key);
     if (/^\s*\d{1,3}\s*$/.test(value)) headerFields.set(x, { x, text: value.trim(), at: now });
     else headerFields.delete(x);
-    checkHeader();
+    if (watching) checkHeader();
   };
 
   const inspect = (value) => {
@@ -146,8 +151,18 @@
     }
   };
 
+  const setWatching = (active) => {
+    if (active === watching) return;
+    watching = active;
+    if (!active) return;
+    lastValue = "";
+    for (const label of [...recentLabels]) inspect(label);
+    checkHeader();
+  };
+
   window.addEventListener("message", (event) => {
     if ((event.source !== window.parent && event.source !== window.top) || !trustedOrigin(event.origin)) return;
+    if (event.data?.type === "ogo-game-watch") { setWatching(event.data.active === true); return; }
     const list = event.data?.type === "ogo-game-keywords" ? event.data.keywords : null;
     if (!Array.isArray(list) || !list.every((item) => typeof item === "string" && item.length <= 40)) return;
     keywords = list.slice(0, 500);
@@ -181,7 +196,8 @@
     const wrapped = function (...args) {
       try {
         for (const text of textsOf(this, args)) {
-          inspect(text);
+          if (watching) inspect(text);
+          else rememberLabel(text);
           if (owner === "TextField" && name === "buildBitmapFontText") noteHeaderField(this, text);
         }
       } catch {}
