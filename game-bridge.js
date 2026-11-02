@@ -61,8 +61,10 @@
   const state = { calendar: "", year: null, month: null, stage: "" };
   let lastSent = "";
   // Keywords come from the guides the player selected. Only those that appear on screen are reported, never the text around them.
-  const { findKeywords } = window.OgoTimePoints;
+  const { createKeywordMatcher } = window.OgoTimePoints;
   let keywords = [];
+  let matchKeywords = createKeywordMatcher(keywords);
+  let hasCultivation = false;
   let lastKeywords = "";
   let lastValue = "";
   // Labels already on screen are not drawn again, so keep a few to check when the keyword list arrives. They stay in this frame.
@@ -110,9 +112,9 @@
   const HEADER_MIN_X = 300;
   const headerFields = new Map();
   const checkHeader = () => {
-    if (!keywords.some((keyword) => keyword.startsWith("修炼"))) return;
+    if (!hasCultivation) return;
     const date = headerDate([...headerFields.values()]);
-    if (date) publishKeywords(findKeywords(`修炼${date.year}年${date.month}月`, keywords));
+    if (date) publishKeywords(matchKeywords(`修炼${date.year}年${date.month}月`));
   };
   const noteHeaderField = (field, value) => {
     if (typeof value !== "string" || typeof field?.x !== "number" || typeof field.y !== "number" || field.y < 0 || field.y > HEADER_MAX_Y || field.x < HEADER_MIN_X) return;
@@ -138,8 +140,8 @@
     publish();
     if (keywords.length) {
       // The month may be drawn just before the week, so a match in this text alone still has to hold in the rolling text.
-      const joinedFound = findKeywords(recent, keywords);
-      const direct = value.length <= 60 ? findKeywords(value, keywords).filter((keyword) => joinedFound.includes(keyword)) : [];
+      const joinedFound = matchKeywords(recent);
+      const direct = value.length <= 60 ? matchKeywords(value).filter((keyword) => joinedFound.includes(keyword)) : [];
       publishKeywords(direct.length ? direct : joinedFound);
     }
   };
@@ -149,13 +151,15 @@
     const list = event.data?.type === "ogo-game-keywords" ? event.data.keywords : null;
     if (!Array.isArray(list) || !list.every((item) => typeof item === "string" && item.length <= 40)) return;
     keywords = list.slice(0, 500);
+    matchKeywords = createKeywordMatcher(keywords);
+    hasCultivation = keywords.some((keyword) => keyword.startsWith("修炼"));
     lastKeywords = "";
     lastValue = "";
     checkHeader();
-    const fromPieces = findKeywords(lastPieces, keywords);
+    const fromPieces = matchKeywords(lastPieces);
     if (fromPieces.length) publishKeywords(fromPieces);
     else for (let i = recentLabels.length - 1; i >= 0; i--) {
-      const found = findKeywords(recentLabels[i], keywords);
+      const found = matchKeywords(recentLabels[i]);
       if (found.length) { publishKeywords(found); break; }
     }
   });

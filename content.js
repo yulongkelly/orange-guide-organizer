@@ -444,9 +444,12 @@
   };
   // Loading a save can change the reading many times a second, and the panel shares a thread with the game.
   // Readings still apply at once; only saving and redrawing wait. Other tabs redraw when they are opened.
+  // What the 定位 tab shows depends on these; render() records them, so a flush redraws only when they differ from the last draw.
+  const locateSignature = () => JSON.stringify([gameTimeRead && [gameTimeRead.calendar, gameTimeRead.year, gameTimeRead.month, gameTimeRead.stage], gameMarker?.keywords, pinnedSection]);
+  let drawnLocate = "";
   const gameTimeFlush = timeApi.createCoalescer(() => {
     saveGameTime();
-    if (activeTopic === "定位") render();
+    if (activeTopic === "定位" && locateSignature() !== drawnLocate) render();
   }, 200);
   const acceptGameTimeMessage = (event) => {
     const d = event.data;
@@ -576,6 +579,7 @@
   }
 
   function render() {
+    drawnLocate = locateSignature();
     syncKeywords();
     const topicsFound =["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
     topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : topic === "定位" && guides.length ? ` ${guides.length}` : ""}</button>`).join("");
