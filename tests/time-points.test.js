@@ -252,6 +252,22 @@ test("切分：headings:false 时 # 不当作标题，只靠段落里的时间�
   assert.equal(sections.length, 3);
 });
 
+const { rememberIn } = require("../game-bridge.js");
+test("rememberIn：最新的文字排在最后，重复绘制时移到最后", () => {
+  const labels = [];
+  for (const value of ["庆和22年9月", "银两", "庆和22年10月", "银两", "庆和22年9月"]) rememberIn(labels, value);
+  assert.deepEqual(labels, ["庆和22年10月", "银两", "庆和22年9月"]);
+});
+test("rememberIn：忽略空白、过长和非字符串，最多保留 60 条", () => {
+  const labels = [];
+  for (const value of ["  ", "长".repeat(41), 5, null]) rememberIn(labels, value);
+  assert.deepEqual(labels, []);
+  for (let i = 0; i < 70; i++) rememberIn(labels, `第${i}条`);
+  assert.equal(labels.length, 60);
+  assert.equal(labels[0], "第10条");
+  assert.equal(labels[59], "第69条");
+});
+
 const { createCoalescer } = require("../time-points.js");
 test("createCoalescer：等待期间的请求合并，且不被持续请求推迟", () => {
   const pending = [];

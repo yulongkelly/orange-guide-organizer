@@ -442,6 +442,16 @@
     sentKeywords = signature;
     try { target.postMessage({ type: "ogo-game-keywords", keywords: list }, bridge?.origin || location.origin); } catch {}
   };
+  // The game frame checks drawn text only while the 定位 tab is showing.
+  let sentWatch = null;
+  const syncWatch = (force = false) => {
+    const target = bridge?.source || gameFrame()?.contentWindow;
+    if (!target) return;
+    const active = activeTopic === "定位" && panel.classList.contains("open");
+    if (!force && active === sentWatch) return;
+    sentWatch = active;
+    try { target.postMessage({ type: "ogo-game-watch", active }, bridge?.origin || location.origin); } catch {}
+  };
   // Loading a save can change the reading many times a second, and the panel shares a thread with the game.
   // Readings still apply at once; only saving and redrawing wait. Other tabs redraw when they are opened.
   // What the 定位 tab shows depends on these; render() records them, so a flush redraws only when they differ from the last draw.
@@ -454,7 +464,7 @@
   const acceptGameTimeMessage = (event) => {
     const d = event.data;
     if (!d || !fromGameFrame(event)) return;
-    if (d.type === "ogo-bridge-ready") { bridge = { source: event.source, origin: event.origin }; syncKeywords(true); return; }
+    if (d.type === "ogo-bridge-ready") { bridge = { source: event.source, origin: event.origin }; syncKeywords(true); syncWatch(true); return; }
     if (d.type === "ogo-game-keywords-found") {
       const known = activeKeywords();
       if (!Array.isArray(d.keywords) || !d.keywords.length || !d.keywords.every((k) => known.includes(k))) return;
@@ -581,6 +591,7 @@
   function render() {
     drawnLocate = locateSignature();
     syncKeywords();
+    syncWatch();
     const topicsFound =["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
     topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : topic === "定位" && guides.length ? ` ${guides.length}` : ""}</button>`).join("");
     folderNav.hidden = activeTopic !== "收藏";
@@ -790,14 +801,14 @@
   }
 
   launcher.addEventListener("click", () => {
-    const toggle = () => panel.classList.toggle("open");
+    const toggle = () => { panel.classList.toggle("open"); syncWatch(); };
     if (!editing) toggle();
     else if (editDirty()) askLeave(toggle);
     else leaveEdit(toggle);
   });
   panel.addEventListener("click", async (event) => {
     const close = event.target.closest('[data-action="close"]');
-    if (close) panel.classList.remove("open");
+    if (close) { panel.classList.remove("open"); syncWatch(); }
     if (event.target.closest('[data-action="accept-consent"]')) {
       chrome.storage.local.set({ ogoDataConsentV1: true }, () => {
         consentGranted = true;
@@ -806,7 +817,7 @@
         scan();
       });
     }
-    if (event.target.closest('[data-action="decline-consent"]')) panel.classList.remove("open");
+    if (event.target.closest('[data-action="decline-consent"]')) { panel.classList.remove("open"); syncWatch(); }
     if (event.target.closest('[data-action="scan"]')) scan();
     if (event.target.closest('[data-action="scan-all-pages"]')) await scanAllPages();
     const topicButton = event.target.closest("[data-topic]");
