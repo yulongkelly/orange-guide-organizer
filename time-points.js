@@ -183,15 +183,49 @@
     if (Number(to) < Number(from) || Number(to) - Number(from) > 60) return [normalizeKeyword(item)];
     return Array.from({ length: Number(to) - Number(from) + 1 }, (_, i) => `${before}${Number(from) + i}${after}`);
   };
+  // "图:ca9bc9e1f0a2" names a picture the game draws by the start of its file's md5, which is the same for every player.
+  // It is kept as lowercase hex and never normalized like text; fewer than 8 hex digits would match too many pictures.
+  // "图:aaaa…+bbbb…" (or "图:aaaa…+图:bbbb…") needs all of those pictures on screen at once, e.g. the 66 layer and the 十月 layer.
+  // Parts are sorted so the same combination is always written the same way; a combination with a too-short part is dropped.
+  const IMAGE_PREFIX = "图:";
+  const isImageKeyword = (keyword) => String(keyword).startsWith(IMAGE_PREFIX);
+  const imageParts = (keyword) => keyword.slice(IMAGE_PREFIX.length).split("+");
+  const imageKeyword = (item) => {
+    const match = String(item).trim().match(/^图\s*[:：]([^]*)$/);
+    if (!match) return null;
+    const parts = [...new Set(match[1].split(/[+＋]/).map((part) => part.replace(/^\s*图\s*[:：]/, "").replace(/[^0-9a-f]/gi, "").toLowerCase().slice(0, 32)))].sort();
+    return parts.length <= 4 && parts.every((hex) => hex.length >= 8) ? `${IMAGE_PREFIX}${parts.join("+")}` : "";
+  };
   // "暑假第四周 [第4-8周|暑假]" -> title 暑假第四周, keywords 第4周…第8周, 暑假
   function parseHeadingKeywords(heading) {
     const match = String(heading || "").match(/^(.*?)\s*\[([^[\]]+)\]\s*$/);
     if (!match) return { title: String(heading || ""), keywords: [] };
-    const keywords = [...new Set(match[2].split(/[|｜]/).flatMap(expandKeyword).filter(Boolean))];
+    const keywords = [...new Set(match[2].split(/[|｜]/).flatMap((item) => { const image = imageKeyword(item); return image == null ? expandKeyword(item) : [image]; }).filter(Boolean))];
     return { title: match[1] || match[2], keywords };
   }
-  // "第1周!月" is 第1周 unless 月 comes right before it, so it matches 第1周 周一 but not 9月 第1周.
-  const keywordLabel = (keyword) => keyword.split("!")[0];
+  // "第1周!月" is 第1周 unless 月 comes right before it, so it matches 第1周 周一 but not 9月 第1周. Pictures have no text label.
+  const keywordLabel = (keyword) => (isImageKeyword(keyword) ? "" : keyword.split("!")[0]);
+  // The picture keywords whose pictures are all among `md5s` (what is on screen). When one hit's pictures are part of another's
+  // (十月 alone, and 66+十月), only the larger combination is kept, like the more specific text keyword.
+  const findImageKeywords = (md5s, keywords) => {
+    const shown = [...md5s].map((md5) => String(md5).toLowerCase());
+    const hits = keywords.filter((keyword) => isImageKeyword(keyword) && imageParts(keyword).every((hex) => shown.some((md5) => md5.startsWith(hex))));
+    return hits.filter((hit) => !hits.some((other) => other !== hit && imageParts(hit).every((hex) => imageParts(other).includes(hex))));
+  };
+  // Whether a picture keyword involves this md5 (so a newly loaded picture only reports the keywords it takes part in).
+  const imageKeywordUses = (keyword, md5) => isImageKeyword(keyword) && imageParts(keyword).some((hex) => String(md5).toLowerCase().startsWith(hex));
+  // The year part of a dated keyword: 靖安成16年10月 -> 靖安成16年.
+  const yearOfKeyword = (keyword) => keywordLabel(keyword).match(/^\D*\d+年/)?.[0] || "";
+  // One guide may list the same picture in several sections (十月上 looks the same every year). candidates are { index, keywords } in guide order.
+  // Prefer a section whose dated keywords carry a year from `context` (text keywords last read on screen); then the first at or after
+  // `current` (the game only moves forward, so this rolls into the next year); then the first one. Returns -1 when there are none.
+  function pickImageSection(candidates, { context = [], current = -1 } = {}) {
+    if (!candidates.length) return -1;
+    const years = new Set(context.map(yearOfKeyword).filter(Boolean));
+    const sameYear = candidates.filter((c) => c.keywords.some((k) => years.has(yearOfKeyword(k))));
+    const pool = sameYear.length ? sameYear : candidates;
+    return (pool.find((c) => c.index >= current) || pool[0]).index;
+  }
   // Which keywords appear in a short on-screen label. Long text is dialogue, which may merely mention a date.
   const prepareKeyword = (keyword) => { const [word, notAfter] = keyword.split("!"); return { word, notAfter }; };
   const keywordHits = (value, { word, notAfter }) => {
@@ -363,7 +397,7 @@
     };
   }
 
-  const api = { createCoalescer, normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, createKeywordMatcher, keywordLabel };
+  const api = { createCoalescer, normalizeNewlines, replaceRange, remapSectionIndexes, createTextCache, parseTimePoints, classifyTimePoint, pointAhead, splitGuideSections, sectionAhead, parseCn, normalizeKeyword, parseHeadingKeywords, findKeywords, createKeywordMatcher, keywordLabel, isImageKeyword, findImageKeywords, imageKeywordUses, pickImageSection };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.OgoTimePoints = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

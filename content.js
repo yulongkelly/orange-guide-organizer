@@ -455,7 +455,29 @@
   // Loading a save can change the reading many times a second, and the panel shares a thread with the game.
   // Readings still apply at once; only saving and redrawing wait. Other tabs redraw when they are opened.
   // What the 定位 tab shows depends on these; render() records them, so a flush redraws only when they differ from the last draw.
-  const locateSignature = () => JSON.stringify([gameTimeRead && [gameTimeRead.calendar, gameTimeRead.year, gameTimeRead.month, gameTimeRead.stage], gameMarker?.keywords, pinnedSection]);
+  const locateSignature = () => JSON.stringify([gameTimeRead && [gameTimeRead.calendar, gameTimeRead.year, gameTimeRead.month, gameTimeRead.stage], gameMarker?.keywords, gameMarker?.keys, pinnedSection]);
+  // When the screen matches 靖安成15年 and 靖安成15年4月, only the more specific one places the guide (四月, not the whole year).
+  const specificKeywords = (list) => list.filter((k, _, all) => !all.some((other) => other !== k && other.includes(k)));
+  // Keys of the sections the last report placed the player in. Picture reports carry their keys; text reports are matched here.
+  const markedSectionKeys = () => {
+    if (pinnedSection) return [pinnedSection];
+    if (gameMarker?.keys) return gameMarker.keys;
+    const marker = specificKeywords(gameMarker?.keywords || []);
+    return guides.filter((g) => g.enabled).flatMap((g) => sectionsOf(g).flatMap((s, i) => (s.keywords.some((k) => marker.includes(k)) ? [sectionKey(g, i)] : [])));
+  };
+  // A guide can list the same picture in several sections (十月上 every year); each guide gets the one section that fits best.
+  const placeImageHits = (hits) => {
+    const previous = markedSectionKeys();
+    const keys = [];
+    for (const g of guides.filter((x) => x.enabled)) {
+      const prefix = `${g.id}:`;
+      const candidates = sectionsOf(g).map((s, index) => ({ index, keywords: s.keywords })).filter((c) => c.keywords.some((k) => hits.includes(k)));
+      const current = Math.max(-1, ...previous.filter((k) => k.startsWith(prefix)).map((k) => Number(k.slice(prefix.length))));
+      const index = timeApi.pickImageSection(candidates, { context: gameMarker?.context || [], current });
+      if (index >= 0) keys.push(sectionKey(g, index));
+    }
+    return keys;
+  };
   let drawnLocate = "";
   const gameTimeFlush = timeApi.createCoalescer(() => {
     saveGameTime();
@@ -468,8 +490,16 @@
     if (d.type === "ogo-game-keywords-found") {
       const known = activeKeywords();
       if (!Array.isArray(d.keywords) || !d.keywords.length || !d.keywords.every((k) => known.includes(k))) return;
-      if (!pinnedSection && d.keywords.join("|") === gameMarker?.keywords.join("|")) return;
-      gameMarker = { keywords: d.keywords, at: Date.now() };
+      // Text keywords are also kept as `context`, so a picture shared by every year can still pick the year last read on screen.
+      const words = d.keywords.filter((k) => !timeApi.isImageKeyword(k));
+      if (words.length) {
+        if (!pinnedSection && !gameMarker?.keys && words.join("|") === gameMarker?.keywords.join("|")) return;
+        gameMarker = { keywords: words, context: words, at: Date.now() };
+      } else {
+        const keys = placeImageHits(d.keywords);
+        if (!keys.length || (!pinnedSection && keys.join("|") === gameMarker?.keys?.join("|"))) return;
+        gameMarker = { keywords: d.keywords, keys, context: gameMarker?.context || [], at: Date.now() };
+      }
       pinnedSection = "";
       gameTimeFlush.request();
       return;
@@ -520,11 +550,10 @@
     const usingRead = followGame && readTime();
     const selected = guides.filter((g) => g.enabled);
     const entries = [];
-    // When the screen matches 靖安成15年 and 靖安成15年4月, only the more specific one places the guide (四月, not the whole year).
-    const marker = (gameMarker?.keywords || []).filter((k, _, all) => !all.some((other) => other !== k && other.includes(k)));
+    const marker = specificKeywords(gameMarker?.keywords || []);
     const aheadOf = (section, key) => {
       if (pinnedSection) return key === pinnedSection ? 0 : null;
-      if (section.keywords.length) return section.keywords.some((k) => marker.includes(k)) ? 0 : null;
+      if (section.keywords.length) return (gameMarker?.keys ? gameMarker.keys.includes(key) : section.keywords.some((k) => marker.includes(k))) ? 0 : null;
       return shown && section.kind === "time" ? timeApi.sectionAhead(section, shown) : null;
     };
     for (const guide of selected) sectionsOf(guide).forEach((section, index) => { const key = sectionKey(guide, index); entries.push({ guide, section, key, ahead: aheadOf(section, key) }); });
@@ -535,7 +564,8 @@
     const afterNow = timed[timed.lastIndexOf(nowEntries[nowEntries.length - 1]) + 1];
     const nextEntries = Number.isFinite(nextAhead) ? timed.filter((e) => e.ahead === nextAhead) : nowEntries.length && afterNow ? [afterNow] : [];
     const pinnedTitle = entries.find((e) => e.key === pinnedSection)?.section.title || "";
-    const markerLabel = marker.map(timeApi.keywordLabel).sort((a, b) => b.length - a.length)[0] || "";
+    // A picture has no text of its own, so its position is named by the section it placed.
+    const markerLabel = gameMarker?.keys ? entries.find((e) => e.key === gameMarker.keys[0])?.section.title || "" : marker.map(timeApi.keywordLabel).sort((a, b) => b.length - a.length)[0] || "";
     const positionLabel = pinnedTitle || markerLabel;
     const many = selected.length > 1;
     const stageWarnings = selected.filter((g) => g.stage && base?.stage && g.stage !== base.stage).map((g) => `当前已是${base.stage}，“${g.name}”标注为${g.stage}攻略（仅提示，不会自动切换）。`);
@@ -1027,10 +1057,16 @@
     const opens = [...secOpen].filter(([key]) => key.startsWith(prefix));
     for (const [key] of opens) secOpen.delete(key);
     for (const [key, value] of opens) { const next = moved(key); if (next) secOpen.set(next, value); }
+    let changed = false;
     if (pinnedSection.startsWith(prefix)) {
       const next = moved(pinnedSection);
-      if (next !== pinnedSection) { pinnedSection = next; saveGameTime(); }
+      if (next !== pinnedSection) { pinnedSection = next; changed = true; }
     }
+    if (gameMarker?.keys?.some((key) => key.startsWith(prefix))) {
+      gameMarker = { ...gameMarker, keys: gameMarker.keys.map((key) => (key.startsWith(prefix) ? moved(key) : key)).filter(Boolean) };
+      changed = true;
+    }
+    if (changed) saveGameTime();
   }
   // "保存": writes the text, leaves edit mode and re-renders (which also sends changed keywords to the game). Stays in edit mode if saving failed.
   // `then(changed)` runs after the edit state is cleared and before the re-render, so a click that was waiting for the edit to end still finds its target.

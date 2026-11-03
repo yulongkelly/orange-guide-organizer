@@ -115,15 +115,58 @@
     return rows.map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.text).join("\n")).join("\n");
   };
 
-  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, keywordEras, eraDate, globalPosition, topOf, readingOrder }; return; }
+  // Pure: the md5 a resource address is named by (".../ca9bc9e1f0a2….png"), or "" when it has none. The path wins over the query.
+  const MD5 = /(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])/gi;
+  const md5FromUrl = (url) => {
+    if (typeof url !== "string" || url.length > 2000) return "";
+    for (const part of [url.split(/[?#]/)[0], url]) {
+      const all = part.match(MD5);
+      if (all) return all[all.length - 1].toLowerCase();
+    }
+    return "";
+  };
+
+  // Pure: md5s of the pictures in a scene tree that are showing, in drawing order, each once. `imageOf(node)` gives an md5 or "".
+  const CHILD_KEYS = ["children", "_children", "childs", "_childs", "childList", "_childList", "$children"];
+  const NESTED_KEYS = ["bitmap", "_bitmap", "texture", "_texture", "image", "_image"];
+  const URL_KEYS = ["url", "_url", "src", "_src", "path", "_path", "fileName", "_fileName"];
+  const hidden = (node) => node.visible === false || node._visible === false || node.isVisible === false || node.alpha === 0 || node._alpha === 0 || node.opacity === 0;
+  // A node's picture from its own address fields, or from the bitmap/texture it holds.
+  const md5FromFields = (node) => {
+    for (const owner of [node, ...NESTED_KEYS.map((k) => node[k])]) {
+      if (!owner || typeof owner !== "object") continue;
+      for (const key of URL_KEYS) { const md5 = md5FromUrl(owner[key]); if (md5) return md5; }
+    }
+    return "";
+  };
+  const collectVisibleImages = (root, imageOf = md5FromFields, limit = 3000) => {
+    const md5s = new Set();
+    const seen = new Set();
+    const walk = (node, depth) => {
+      if (!node || typeof node !== "object" || seen.has(node) || seen.size >= limit || depth > 30) return;
+      seen.add(node);
+      try {
+        if (hidden(node)) return;
+        const md5 = imageOf(node);
+        if (md5) md5s.add(md5);
+        for (const key of CHILD_KEYS) if (Array.isArray(node[key])) for (const child of node[key]) walk(child, depth + 1);
+      } catch {}
+    };
+    walk(root, 0);
+    return [...md5s];
+  };
+
+  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, keywordEras, eraDate, globalPosition, topOf, readingOrder, md5FromUrl, collectVisibleImages }; return; }
   if (window.__ogoGameBridge || window === window.top) return;
   window.__ogoGameBridge = true;
   const rolling = createRolling();
   const state = { calendar: "", year: null, month: null, stage: "" };
   let lastSent = "";
   // Keywords come from the guides the player selected. Only those that appear on screen are reported, never the text around them.
-  const { createKeywordMatcher } = window.OgoTimePoints;
+  const { createKeywordMatcher, isImageKeyword, findImageKeywords, imageKeywordUses } = window.OgoTimePoints;
   let keywords = [];
+  // 图:… keywords, matched against the md5 of pictures the game loads.
+  let imageKeywords = [];
   let matchKeywords = createKeywordMatcher(keywords);
   let hasCultivation = false;
   let lastKeywords = "";
@@ -156,7 +199,10 @@
     send({ type: "ogo-game-time", calendar: state.calendar, year: state.year, month: state.month, stage: state.stage, at: Date.now() });
   };
 
+  // Pictures are only a fallback: a picture is not reported when on-screen text matched a keyword around the same time.
+  let lastTextHitAt = 0;
   const publishKeywords = (found) => {
+    if (found.length && !found.some(isImageKeyword)) lastTextHitAt = Date.now();
     const signature = found.join("|");
     if (!found.length || signature === lastKeywords) return;
     lastKeywords = signature;
@@ -263,6 +309,39 @@
     if (fields.size > 300) fields.delete(fields.keys().next().value);
     markRows([field]);
   };
+  // Only md5s of loaded pictures are kept (by the object that loaded them, and the last 60 for when the scene tree can't be read).
+  // They stay in this frame; only a guide's own 图:… keyword that matches is ever reported.
+  const loadedBy = new WeakMap();
+  const recentImages = [];
+  const TEXT_WINDOW = 1000;
+  const IMAGE_WAIT = 400;
+  // What is on screen now: the scene tree when it can be read, else the most recently loaded pictures.
+  const shownImages = () => {
+    let shown = [];
+    try { shown = collectVisibleImages(window.GlobalData?._instance?._commonCanvas, (node) => loadedBy.get(node) || md5FromFields(node)); } catch {}
+    return shown.length ? shown : recentImages;
+  };
+  // `triggers` are the pictures that just appeared; only keywords that use one of them are reported. Combinations are checked against
+  // everything on screen, since their other pictures may have been loaded long before.
+  const checkImages = (triggers) => {
+    if (!watching || !imageKeywords.length || !imageKeywords.some((keyword) => triggers.some((md5) => imageKeywordUses(keyword, md5)))) return;
+    const at = Date.now();
+    // Wait a moment: the date text on the same screen may be drawn just after the picture loads, and the new layer joins the scene.
+    setTimeout(() => {
+      if (!watching || lastTextHitAt >= at - TEXT_WINDOW) return;
+      const found = findImageKeywords([...shownImages(), ...triggers], imageKeywords).filter((keyword) => triggers.some((md5) => imageKeywordUses(keyword, md5)));
+      if (found.length) publishKeywords(found);
+    }, IMAGE_WAIT);
+  };
+  const noteImage = (self, args) => {
+    let md5 = "";
+    for (const arg of args) if (typeof arg === "string" && (md5 = md5FromUrl(arg))) break;
+    if (!md5) return;
+    if (self && typeof self === "object") loadedBy.set(self, md5);
+    rememberIn(recentImages, md5);
+    checkImages([md5]);
+  };
+  const checkVisible = () => checkImages(shownImages());
 
   const setWatching = (active) => {
     if (active === watching) return;
@@ -272,14 +351,16 @@
     for (const label of [...recentLabels]) inspect(label);
     checkHeader();
     markRows([...fields.keys()]);
+    checkVisible();
   };
 
   window.addEventListener("message", (event) => {
     if ((event.source !== window.parent && event.source !== window.top) || !trustedOrigin(event.origin)) return;
     if (event.data?.type === "ogo-game-watch") { setWatching(event.data.active === true); return; }
     const list = event.data?.type === "ogo-game-keywords" ? event.data.keywords : null;
-    if (!Array.isArray(list) || !list.every((item) => typeof item === "string" && item.length <= 40)) return;
-    keywords = list.slice(0, 500);
+    if (!Array.isArray(list) || !list.every((item) => typeof item === "string" && item.length <= (isImageKeyword(item) ? 150 : 40))) return;
+    keywords = list.slice(0, 500).filter((keyword) => !isImageKeyword(keyword));
+    imageKeywords = list.slice(0, 500).filter(isImageKeyword);
     matchKeywords = createKeywordMatcher(keywords);
     hasCultivation = keywords.some((keyword) => keyword.startsWith("修炼"));
     lastKeywords = "";
@@ -292,6 +373,7 @@
       if (found.length) { publishKeywords(found); break; }
     }
     markRows([...fields.keys()]);
+    checkVisible();
   });
 
   const textsOf = (self, args) => {
@@ -323,6 +405,17 @@
     wrapped.__ogoWrapped = true;
     try { proto[name] = wrapped; } catch {}
   };
+  // Same for picture loads: the address is read before the original runs.
+  const wrapLoad = (proto) => {
+    const original = proto?.load;
+    if (typeof original !== "function" || original.__ogoWrapped) return;
+    const wrapped = function (...args) {
+      try { noteImage(this, args); } catch {}
+      return original.apply(this, args);
+    };
+    wrapped.__ogoWrapped = true;
+    try { proto.load = wrapped; } catch {}
+  };
 
   // Text-carrying methods only; per-frame methods such as update/draw are left alone.
   const TEXT_METHOD = /text|label|caption|content/i;
@@ -336,12 +429,14 @@
   };
   const install = () => {
     installLowLevel();
+    for (const name of ["Sprite", "Button"]) if (typeof window[name] === "function") wrapLoad(window[name].prototype);
     if (typeof window.GLTools === "function") for (const name of ["getTextArr", "getTextWidth"]) wrap("GLTools", window.GLTools.prototype, name);
     if (typeof window.TextField !== "function") return false;
     for (const name of Object.getOwnPropertyNames(window.TextField.prototype)) if (name !== "constructor" && TEXT_METHOD.test(name)) wrap("TextField", window.TextField.prototype, name);
     if (typeof window.Font === "function") for (const name of ["drawText", "getTextWidth"]) wrap("Font", window.Font.prototype, name);
     if (typeof window.SALText === "function") for (const name of Object.getOwnPropertyNames(window.SALText.prototype || {})) if (name !== "constructor" && TEXT_METHOD.test(name)) wrap("SALText", window.SALText.prototype, name);
-    return true;
+    // Keep trying (until the timer gives up) while the picture classes are not defined yet.
+    return typeof window.Sprite === "function";
   };
 
   if (!install()) {
