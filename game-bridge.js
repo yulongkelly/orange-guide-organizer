@@ -27,14 +27,16 @@
   };
 
   // Pure: short rolling buffer of the most recent drawn text, so a date drawn in pieces ("庆和", "19", "年"…) can still be matched.
-  // It keeps only the last ~40 characters and forgets everything after a pause.
+  // It keeps only the last ~40 characters and forgets everything after a pause. Two numbers drawn one after another ("30", "1")
+  // are kept apart by a line break, so they are read as 30 and 1, not 301.
   const createRolling = () => {
     let text = "";
     let last = 0;
     return (fragment, now) => {
       if (now - last > 800) text = "";
       last = now;
-      text = (text + String(fragment).slice(-40)).slice(-40);
+      const piece = String(fragment).slice(-40);
+      text = (text + (/\d$/.test(text) && /^\d/.test(piece) ? "\n" : "") + piece).slice(-40);
       return text;
     };
   };
@@ -61,6 +63,56 @@
     if (seen >= 0) labels.splice(seen, 1);
     labels.push(value);
     if (labels.length > 60) labels.shift();
+  };
+
+  // Pure: eras the guide's keywords count years in: 昭元30年 -> 昭元, 靖安成15年4月 -> 靖安成.
+  const keywordEras = (keywords) => [...new Set(keywords.map((keyword) => keyword.split("!")[0].match(/^(\D+?)\d+年/)?.[1]).filter(Boolean))];
+  // Pure: some games draw the era and the numbers as text but bake 年/月 into the background ("昭", "元", "30", "1", "辰").
+  // An era from the guide followed by two separate numbers is read as that year and month: { era: "昭元", year: 30, month: 1, text: "昭元30年1月" }.
+  const eraDate = (text, eras) => {
+    for (const era of eras) {
+      const letters = [...era].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+      const match = String(text).match(new RegExp(`${letters}\\s*(\\d{1,3})\\s+(\\d{1,2})(?!\\d)`));
+      const year = match && Number(match[1]);
+      const month = match && Number(match[2]);
+      if (match && month >= 1 && month <= 12) return { era, year, month, text: `${era}${year}年${month}月` };
+    }
+    return null;
+  };
+
+  // Pure: a display object's position on screen. Engine x/y are relative to the parent, so add them up the parent chain,
+  // scaling by each parent's scale on the way.
+  const parentOf = (node) => node.parent || node._parent || null;
+  const globalPosition = (node) => {
+    let x = Number(node.x) || 0;
+    let y = Number(node.y) || 0;
+    for (let p = parentOf(node), depth = 0; p && depth < 50; p = parentOf(p), depth++) {
+      x = x * (Number.isFinite(p.scaleX) ? p.scaleX : 1) + (Number(p.x) || 0);
+      y = y * (Number.isFinite(p.scaleY) ? p.scaleY : 1) + (Number(p.y) || 0);
+    }
+    return { x, y };
+  };
+  // Pure: the outermost container, and whether the node or a container above it is hidden. A field removed from the screen
+  // ends up under another top than the fields still showing.
+  const topOf = (node) => {
+    let top = node;
+    for (let p = parentOf(node), depth = 0; p && depth < 50; p = parentOf(p), depth++) top = p;
+    return top;
+  };
+  const hiddenUp = (node) => {
+    for (let n = node, depth = 0; n && depth < 50; n = parentOf(n), depth++) if (n.visible === false || n._visible === false) return true;
+    return false;
+  };
+  // Pure: texts in the order a reader sees them: rows top to bottom (within `tolerance` px counts as one row), left to right in a row.
+  // One line break between texts, which keyword matching drops except between two numbers (30 and 1 stay apart).
+  const readingOrder = (items, tolerance = 8) => {
+    const rows = [];
+    for (const item of [...items].sort((a, b) => a.y - b.y)) {
+      const row = rows[rows.length - 1];
+      if (row && item.y - row.y <= tolerance) row.items.push(item);
+      else rows.push({ y: item.y, items: [item] });
+    }
+    return rows.map((row) => row.items.sort((a, b) => a.x - b.x).map((item) => item.text).join("\n")).join("\n");
   };
 
   // Pure: the md5 a resource address is named by (".../ca9bc9e1f0a2….png"), or "" when it has none. The path wins over the query.
@@ -104,7 +156,7 @@
     return [...md5s];
   };
 
-  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, md5FromUrl, collectVisibleImages }; return; }
+  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, keywordEras, eraDate, globalPosition, topOf, readingOrder, md5FromUrl, collectVisibleImages }; return; }
   if (window.__ogoGameBridge || window === window.top) return;
   window.__ogoGameBridge = true;
   const rolling = createRolling();
@@ -178,6 +230,15 @@
     if (watching) checkHeader();
   };
 
+  // Eras come from the guide's keywords, so two numbers on screen are only read as a date for a guide that counts years that way.
+  let eras = [];
+  let erasFor = null;
+  const readEra = (text) => {
+    if (erasFor !== keywords) { erasFor = keywords; eras = keywordEras(keywords); }
+    return eras.length ? eraDate(text, eras) : null;
+  };
+  const eraKeywords = (era) => (era ? matchKeywords(era.text) : []);
+
   const inspect = (value) => {
     if (value === lastValue) return;
     lastValue = value;
@@ -188,15 +249,66 @@
     if (value.length <= 3) lastPieces = recent;
     const joined = matchPrefixedDate(recent);
     if (joined) inspectText(joined, state);
+    // Draw order is not screen order, so the era rule reads one text at a time here; split dates are read as rows (checkRows).
+    const era = readEra(value);
+    if (era) Object.assign(state, { calendar: ["庆和", "修炼"].includes(era.era) ? era.era : "", year: era.year, month: era.month });
     publish();
     if (keywords.length) {
       // The month may be drawn just before the week, so a match in this text alone still has to hold in the rolling text.
       const joinedFound = matchKeywords(recent);
       const direct = value.length <= 60 ? matchKeywords(value).filter((keyword) => joinedFound.includes(keyword)) : [];
-      publishKeywords(direct.length ? direct : joinedFound);
+      publishKeywords([...new Set([...eraKeywords(era), ...(direct.length ? direct : joinedFound)])]);
     }
   };
 
+  // A date can be split over several text fields that the game places out of order (1, 30, 辰, 昭, 元), so fields are also read
+  // as a row in screen order: 昭 元 30 1 辰. Only short fields are kept, and only the last 300; their text stays in this frame.
+  const fields = new Map();
+  const dirtyFields = new Set();
+  let rowTimer = 0;
+  const fieldText = (field, fallback) => {
+    for (const key of ["text", "_text", "showText", "_showText"]) if (typeof field[key] === "string") return field[key];
+    return fallback;
+  };
+  const rowText = (field) => {
+    const top = topOf(field);
+    const at = globalPosition(field);
+    const row = [];
+    for (const [other, seen] of fields) {
+      if (topOf(other) !== top || hiddenUp(other)) continue;
+      const text = fieldText(other, seen);
+      const where = globalPosition(other);
+      if (text.length <= 40 && Math.abs(where.y - at.y) <= 8) row.push({ text, ...where });
+    }
+    return readingOrder(row);
+  };
+  // Runs a moment after fields change, once the game has also moved them into place.
+  const checkRows = () => {
+    rowTimer = 0;
+    const done = new Set();
+    for (const field of dirtyFields) {
+      let text = "";
+      try { text = rowText(field); } catch {}
+      if (!text || done.has(text)) continue;
+      done.add(text);
+      const era = readEra(text);
+      if (era) { Object.assign(state, { calendar: ["庆和", "修炼"].includes(era.era) ? era.era : "", year: era.year, month: era.month }); publish(); }
+      if (keywords.length) publishKeywords([...new Set([...eraKeywords(era), ...matchKeywords(text)])]);
+    }
+    dirtyFields.clear();
+  };
+  const markRows = (list) => {
+    if (!watching) return;
+    for (const field of list) dirtyFields.add(field);
+    if (!rowTimer && dirtyFields.size) rowTimer = setTimeout(checkRows, 50);
+  };
+  const noteField = (field, value) => {
+    if (!field || typeof field !== "object" || typeof value !== "string" || value.length > 40) return;
+    fields.delete(field);
+    fields.set(field, value);
+    if (fields.size > 300) fields.delete(fields.keys().next().value);
+    markRows([field]);
+  };
   // Only md5s of loaded pictures are kept (by the object that loaded them, and the last 60 for when the scene tree can't be read).
   // They stay in this frame; only a guide's own 图:… keyword that matches is ever reported.
   const loadedBy = new WeakMap();
@@ -238,6 +350,7 @@
     lastValue = "";
     for (const label of [...recentLabels]) inspect(label);
     checkHeader();
+    markRows([...fields.keys()]);
     checkVisible();
   };
 
@@ -259,6 +372,7 @@
       const found = matchKeywords(recentLabels[i]);
       if (found.length) { publishKeywords(found); break; }
     }
+    markRows([...fields.keys()]);
     checkVisible();
   });
 
@@ -278,11 +392,13 @@
     if (typeof original !== "function" || original.__ogoWrapped) return;
     const wrapped = function (...args) {
       try {
-        for (const text of textsOf(this, args)) {
+        const texts = textsOf(this, args);
+        for (const text of texts) {
           if (watching) inspect(text);
           else rememberLabel(text);
           if (owner === "TextField" && name === "buildBitmapFontText") noteHeaderField(this, text);
         }
+        if (owner === "TextField" && texts.length) noteField(this, texts[0]);
       } catch {}
       return original.apply(this, args);
     };
