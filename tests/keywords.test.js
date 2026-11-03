@@ -66,3 +66,9 @@ test("splitGuideSections：年月攻略不受影响", () => {
   assert.deepEqual(sections.map((s) => s.months), [[1], [3]]);
   assert.ok(sections.every((s) => s.keywords.length === 0));
 });
+
+test("关键词：对白里年和月之间的逗号、句号不影响匹配", () => {
+  const { findKeywords: find, normalizeKeyword: norm } = require("../time-points.js");
+  assert.deepEqual(find("靖安成十五年，四月初一。", [norm("靖安成15年4月"), norm("靖安成15年")]), ["靖安成15年4月", "靖安成15年"]);
+  assert.deepEqual(find("靖安成十五年，五月初一。", [norm("靖安成15年4月")]), []);
+});

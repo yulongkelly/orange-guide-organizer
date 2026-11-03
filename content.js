@@ -520,7 +520,8 @@
     const usingRead = followGame && readTime();
     const selected = guides.filter((g) => g.enabled);
     const entries = [];
-    const marker = gameMarker?.keywords || [];
+    // When the screen matches 靖安成15年 and 靖安成15年4月, only the more specific one places the guide (四月, not the whole year).
+    const marker = (gameMarker?.keywords || []).filter((k, _, all) => !all.some((other) => other !== k && other.includes(k)));
     const aheadOf = (section, key) => {
       if (pinnedSection) return key === pinnedSection ? 0 : null;
       if (section.keywords.length) return section.keywords.some((k) => marker.includes(k)) ? 0 : null;
