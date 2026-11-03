@@ -72,3 +72,11 @@ test("关键词：对白里年和月之间的逗号、句号不影响匹配", ()
   assert.deepEqual(find("靖安成十五年，四月初一。", [norm("靖安成15年4月"), norm("靖安成15年")]), ["靖安成15年4月", "靖安成15年"]);
   assert.deepEqual(find("靖安成十五年，五月初一。", [norm("靖安成15年4月")]), []);
 });
+
+test("normalizeKeyword：分开画的两个数字之间留分隔符，不会连成一个数", () => {
+  assert.equal(normalizeKeyword("昭\n元\n30\n1\n辰"), "昭元30|1辰");
+  assert.equal(normalizeKeyword("三十 一"), "30|1");
+  assert.equal(normalizeKeyword("靖安成十五年，四月初一。"), "靖安成15年4月初1");
+  assert.deepEqual(findKeywords("昭\n元\n30\n1\n辰", ["30", "昭元30", "1", "301"]), ["30", "昭元30", "1"]);
+  assert.deepEqual(findKeywords("30\n1", ["30"]), ["30"]);
+});

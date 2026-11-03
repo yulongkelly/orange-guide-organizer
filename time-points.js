@@ -173,7 +173,9 @@
   // Keywords let a guide follow any game's own clock: a heading such as "## 暑假第一周 [第1周]" matches when the game shows 第1周.
   // Numerals are normalized on both sides, so 第一周 equals 第1周, and 十一月 never counts as 一月.
   // Commas and pauses are dropped too, so a keyword 靖安成15年4月 matches the line "靖安成十五年，四月初一。".
-  const normalizeKeyword = (value) => String(value || "").normalize("NFKC").replace(/[\s,、。·]+/g, "").replace(/[零〇一二三四五六七八九十百]+/g, (m) => parseCn(m) ?? m);
+  const BETWEEN_NUMBERS = /(?<=[\d零〇一二三四五六七八九十百])[\s,、。·]+(?=[\d零〇一二三四五六七八九十百])/g;
+  // Two numbers drawn apart ("30" and "1" for year and month) stay apart as 30|1, so neither 30 nor 1 is lost inside 301.
+  const normalizeKeyword = (value) => String(value || "").normalize("NFKC").replace(BETWEEN_NUMBERS, "|").replace(/[\s,、。·]+/g, "").replace(/[零〇一二三四五六七八九十百]+/g, (m) => parseCn(m) ?? m);
   const expandKeyword = (item) => {
     const range = normalizeKeyword(item).match(/^(\D*)(\d+)[-~至到](\d+)(.*)$/);
     if (!range) return [normalizeKeyword(item)];

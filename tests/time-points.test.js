@@ -307,3 +307,48 @@ test("createKeywordMatcher：超过上限后仍然正确", () => {
   const texts = ["1月", "2月", "3月", "1月", "2月", "3月", "12月", "1月"];
   for (const text of texts) assert.deepEqual(match(text), findKeywords(text, keywords), text);
 });
+
+test("滚动文字：前后两个数字之间换行，不连成一个数", () => {
+  const roll = createRolling();
+  for (const piece of ["昭", "元", "30", "1"]) roll(piece, 0);
+  assert.equal(roll("辰", 0), "昭元30\n1辰");
+  const date = createRolling();
+  for (const piece of ["庆和", "22", "年", "9"]) date(piece, 0);
+  assert.equal(matchPrefixedDate(date("月", 0)), "庆和22年9月");
+});
+
+test("年号日期：攻略里的年号后面跟两个分开的数字，读成年和月", () => {
+  const { keywordEras, eraDate } = require("../game-bridge.js");
+  const eras = keywordEras(["昭元30年", "靖安成15年4月", "第1周!月", "30"]);
+  assert.deepEqual(eras, ["昭元", "靖安成"]);
+  assert.deepEqual(eraDate("昭元30\n1辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
+  assert.deepEqual(eraDate("昭\n元\n30\n1\n辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
+  assert.equal(eraDate("昭元301辰", eras), null, "连在一起的数字不拆");
+  assert.equal(eraDate("昭元30\n13", eras), null, "月份超出 1-12");
+  assert.equal(eraDate("30\n1", eras), null, "没有年号不读");
+  assert.equal(eraDate("昭元30\n1", []), null);
+});
+
+test("屏幕顺序：按父节点累加坐标，同一行从左到右拼字", () => {
+  const { globalPosition, topOf, readingOrder, eraDate } = require("../game-bridge.js");
+  // 实测的签条：子节点顺序是 1、30、辰、昭、元，屏幕上是 昭 元 30 1 辰。
+  const bar = { x: 0, y: 0, parent: null };
+  const field = (text, x, y, parent) => ({ text, x, y, parent });
+  const one = field("1", 213, 14, bar);
+  const thirty = field("30", 152, 14, bar);
+  const hourBox = { x: 261, y: 14, parent: bar };
+  const eraBox = { x: 96, y: 14, parent: bar };
+  const all = [one, thirty, field("辰", 0, 0, hourBox), field("昭", 0, 0, eraBox), field("元", 28, 0, eraBox)];
+  assert.deepEqual(globalPosition(all[4]), { x: 124, y: 14 });
+  assert.equal(topOf(all[4]), bar);
+  const text = readingOrder(all.map((f) => ({ text: f.text, ...globalPosition(f) })));
+  assert.equal(text, "昭\n元\n30\n1\n辰");
+  assert.deepEqual(eraDate(text, ["昭元"]), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
+});
+
+test("屏幕顺序：父容器缩放一起算，不同行分开", () => {
+  const { globalPosition, readingOrder } = require("../game-bridge.js");
+  const scaled = { x: 100, y: 10, scaleX: 2, scaleY: 2, parent: null };
+  assert.deepEqual(globalPosition({ x: 5, y: 3, parent: scaled }), { x: 110, y: 16 });
+  assert.equal(readingOrder([{ text: "b", x: 50, y: 40 }, { text: "甲", x: 9, y: 12 }, { text: "a", x: 10, y: 42 }, { text: "乙", x: 3, y: 18 }]), "乙\n甲\na\nb");
+});
