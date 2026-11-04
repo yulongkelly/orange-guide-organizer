@@ -80,3 +80,24 @@ test("normalizeKeyword：分开画的两个数字之间留分隔符，不会连�
   assert.deepEqual(findKeywords("昭\n元\n30\n1\n辰", ["30", "昭元30", "1", "301"]), ["30", "昭元30", "1"]);
   assert.deepEqual(findKeywords("30\n1", ["30"]), ["30"]);
 });
+
+test("parseHeadingKeywords：带年份的月份范围逐月展开", () => {
+  const months = (n) => Array.from({ length: n }, (_, i) => `15年${i + 1}月`);
+  assert.deepEqual(parseHeadingKeywords("x [15年1-6月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [15年1月-6月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [15年1月-15年6月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [15年1~6月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [15年1到6月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [十五年一至六月]").keywords, months(6));
+  assert.deepEqual(parseHeadingKeywords("x [15年11月-16年2月]").keywords, ["15年11月", "15年12月", "16年1月", "16年2月"]);
+  assert.deepEqual(parseHeadingKeywords("x [昭元30年11月-昭元31年1月]").keywords, ["昭元30年11月", "昭元30年12月", "昭元31年1月"]);
+  assert.deepEqual(parseHeadingKeywords("x [15年1-2月上旬]").keywords, ["15年1月上旬", "15年2月上旬"]);
+});
+
+test("parseHeadingKeywords：不合理的月份范围原样保留", () => {
+  assert.deepEqual(parseHeadingKeywords("x [15年6-1月]").keywords, ["15年6-1月"]);
+  assert.deepEqual(parseHeadingKeywords("x [15年1-13月]").keywords, ["15年1-13月"]);
+  assert.deepEqual(parseHeadingKeywords("x [昭元15年1月-靖安16年2月]").keywords, ["昭元15年1月-靖安16年2月"]);
+  assert.deepEqual(parseHeadingKeywords("x [1-6月]").keywords, ["1月", "2月", "3月", "4月", "5月", "6月"], "原来的写法不变");
+  assert.deepEqual(parseHeadingKeywords("x [修炼8-10年]").keywords, ["修炼8年", "修炼9年", "修炼10年"]);
+});

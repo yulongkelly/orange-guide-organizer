@@ -66,16 +66,21 @@
   };
 
   // Pure: eras the guide's keywords count years in: 昭元30年 -> 昭元, 靖安成15年4月 -> 靖安成.
-  const keywordEras = (keywords) => [...new Set(keywords.map((keyword) => keyword.split("!")[0].match(/^(\D+?)\d+年/)?.[1]).filter(Boolean))];
+  // A keyword that starts with the year (15年1月) gives the empty era "", which is tried last.
+  const keywordEras = (keywords) => [...new Set(keywords.map((keyword) => keyword.split("!")[0].match(/^(\D*?)\d+年/)?.[1]).filter((era) => era != null))].sort((a, b) => b.length - a.length);
   // Pure: some games draw the era and the numbers as text but bake 年/月 into the background ("昭", "元", "30", "1", "辰").
-  // An era from the guide followed by two separate numbers is read as that year and month: { era: "昭元", year: 30, month: 1, text: "昭元30年1月" }.
+  // An era from the guide followed by two separate numbers is read as that year and month, and the text right after is kept
+  // (上旬, 辰): { era: "昭元", year: 30, month: 1, text: "昭元30年1月辰" }. Without an era ("15", "1", "上旬") the two numbers
+  // must be the first numbers in the text, so other numbers on the same row are never read as a date.
   const eraDate = (text, eras) => {
     for (const era of eras) {
       const letters = [...era].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
       const match = String(text).match(new RegExp(`${letters}\\s*(\\d{1,3})\\s+(\\d{1,2})(?!\\d)`));
-      const year = match && Number(match[1]);
-      const month = match && Number(match[2]);
-      if (match && month >= 1 && month <= 12) return { era, year, month, text: `${era}${year}年${month}月` };
+      if (!match || (!era && /\d/.test(text.slice(0, match.index)))) continue;
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const after = text.slice(match.index + match[0].length).replace(/\s+/g, "").match(/^\D{0,6}/)[0];
+      if (month >= 1 && month <= 12) return { era, year, month, text: `${era}${year}年${month}月${after}` };
     }
     return null;
   };
