@@ -176,7 +176,21 @@
   const BETWEEN_NUMBERS = /(?<=[\d零〇一二三四五六七八九十百])[\s,、。·]+(?=[\d零〇一二三四五六七八九十百])/g;
   // Two numbers drawn apart ("30" and "1" for year and month) stay apart as 30|1, so neither 30 nor 1 is lost inside 301.
   const normalizeKeyword = (value) => String(value || "").normalize("NFKC").replace(BETWEEN_NUMBERS, "|").replace(/[\s,、。·]+/g, "").replace(/[零〇一二三四五六七八九十百]+/g, (m) => parseCn(m) ?? m);
+  // 15年1-6月, 15年1月-6月, 15年11月-16年2月 (also ~ 至 到), with or without an era in front: every month in between.
+  const MONTH_RANGE = /^(\D*?)(\d+)年(\d+)月?[-~至到](?:(\D*?)(\d+)年)?(\d+)月(.*)$/;
+  const expandMonths = (value) => {
+    const range = value.match(MONTH_RANGE);
+    if (!range) return null;
+    const [, era, fromYear, fromMonth, toEra, toYear, toMonth, after] = range;
+    const first = Number(fromYear) * 12 + Number(fromMonth) - 1;
+    const last = Number(toYear ?? fromYear) * 12 + Number(toMonth) - 1;
+    const months = [fromMonth, toMonth].map(Number);
+    if ((toEra && toEra !== era) || months.some((m) => m < 1 || m > 12) || last < first || last - first > 60) return [value];
+    return Array.from({ length: last - first + 1 }, (_, i) => `${era}${Math.floor((first + i) / 12)}年${((first + i) % 12) + 1}月${after}`);
+  };
   const expandKeyword = (item) => {
+    const months = expandMonths(normalizeKeyword(item));
+    if (months) return months;
     const range = normalizeKeyword(item).match(/^(\D*)(\d+)[-~至到](\d+)(.*)$/);
     if (!range) return [normalizeKeyword(item)];
     const [, before, from, to, after] = range;

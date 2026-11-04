@@ -320,9 +320,9 @@ test("滚动文字：前后两个数字之间换行，不连成一个数", () =>
 test("年号日期：攻略里的年号后面跟两个分开的数字，读成年和月", () => {
   const { keywordEras, eraDate } = require("../game-bridge.js");
   const eras = keywordEras(["昭元30年", "靖安成15年4月", "第1周!月", "30"]);
-  assert.deepEqual(eras, ["昭元", "靖安成"]);
-  assert.deepEqual(eraDate("昭元30\n1辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
-  assert.deepEqual(eraDate("昭\n元\n30\n1\n辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
+  assert.deepEqual(eras, ["靖安成", "昭元"]);
+  assert.deepEqual(eraDate("昭元30\n1辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月辰" });
+  assert.deepEqual(eraDate("昭\n元\n30\n1\n辰", eras), { era: "昭元", year: 30, month: 1, text: "昭元30年1月辰" });
   assert.equal(eraDate("昭元301辰", eras), null, "连在一起的数字不拆");
   assert.equal(eraDate("昭元30\n13", eras), null, "月份超出 1-12");
   assert.equal(eraDate("30\n1", eras), null, "没有年号不读");
@@ -343,7 +343,7 @@ test("屏幕顺序：按父节点累加坐标，同一行从左到右拼字", ()
   assert.equal(topOf(all[4]), bar);
   const text = readingOrder(all.map((f) => ({ text: f.text, ...globalPosition(f) })));
   assert.equal(text, "昭\n元\n30\n1\n辰");
-  assert.deepEqual(eraDate(text, ["昭元"]), { era: "昭元", year: 30, month: 1, text: "昭元30年1月" });
+  assert.deepEqual(eraDate(text, ["昭元"]), { era: "昭元", year: 30, month: 1, text: "昭元30年1月辰" });
 });
 
 test("屏幕顺序：父容器缩放一起算，不同行分开", () => {
@@ -351,4 +351,24 @@ test("屏幕顺序：父容器缩放一起算，不同行分开", () => {
   const scaled = { x: 100, y: 10, scaleX: 2, scaleY: 2, parent: null };
   assert.deepEqual(globalPosition({ x: 5, y: 3, parent: scaled }), { x: 110, y: 16 });
   assert.equal(readingOrder([{ text: "b", x: 50, y: 40 }, { text: "甲", x: 9, y: 12 }, { text: "a", x: 10, y: 42 }, { text: "乙", x: 3, y: 18 }]), "乙\n甲\na\nb");
+});
+
+test("没有年号：攻略写了 15年1月 这类关键词时，行首两个分开的数字读成年和月", () => {
+  const { keywordEras, eraDate } = require("../game-bridge.js");
+  const eras = keywordEras(["15年1月", "昭元30年"]);
+  assert.deepEqual(eras, ["昭元", ""], "空年号排最后");
+  assert.deepEqual(eraDate("15\n1上旬", eras), { era: "", year: 15, month: 1, text: "15年1月上旬" });
+  assert.deepEqual(eraDate("15\n1\n上旬", eras), { era: "", year: 15, month: 1, text: "15年1月上旬" });
+  assert.equal(eraDate("昭元30\n1辰", eras).era, "昭元", "有年号时先用年号");
+  assert.equal(eraDate("金币\n3\n15\n1", eras), null, "前面还有别的数字时不读");
+  assert.equal(eraDate("151上旬", eras), null);
+  assert.equal(eraDate("15\n1", keywordEras(["1-6月", "第3周"])), null, "攻略里没有带年份的关键词就不读");
+});
+
+test("读出的日期能匹配展开后的关键词", () => {
+  const { eraDate } = require("../game-bridge.js");
+  const { parseHeadingKeywords, findKeywords } = require("../time-points.js");
+  const keywords = parseHeadingKeywords("正月到六月 [15年1-6月]").keywords;
+  assert.deepEqual(findKeywords(eraDate("15\n1上旬", [""]).text, keywords), ["15年1月"]);
+  assert.deepEqual(findKeywords(eraDate("15\n11上旬", [""]).text, keywords), []);
 });
