@@ -372,3 +372,35 @@ test("读出的日期能匹配展开后的关键词", () => {
   assert.deepEqual(findKeywords(eraDate("15\n1上旬", [""]).text, keywords), ["15年1月"]);
   assert.deepEqual(findKeywords(eraDate("15\n11上旬", [""]).text, keywords), []);
 });
+
+test("四位数年份：《娱乐圈暗黑手札》按 日/月/年 排，读成 21年10月27日", () => {
+  const { keywordEras, keywordsUseFullYears, eraDate, readingOrder } = require("../game-bridge.js");
+  const keywords = ["22年", "22年2月", "23年10月"];
+  const eras = keywordEras(keywords);
+  assert.deepEqual(eras, [""]);
+  assert.equal(keywordsUseFullYears(keywords), false);
+  // 实测坐标：27@181、10@241、2021@292 在同一行，时辰 10:00 在下一行。
+  const row = readingOrder([{ text: "2021", x: 292, y: 49 }, { text: "27", x: 181, y: 49 }, { text: "10", x: 241, y: 49 }]);
+  assert.equal(row, "27\n10\n2021");
+  assert.deepEqual(eraDate(row, eras), { era: "", year: 21, month: 10, day: 27, text: "21年10月27日" });
+  assert.deepEqual(eraDate(row, eras, { fullYears: true }), { era: "", year: 2021, month: 10, day: 27, text: "2021年10月27日" });
+  assert.deepEqual(eraDate("10:00\n27\n10\n2021", eras), { era: "", year: 21, month: 10, day: 27, text: "21年10月27日" }, "时辰不算日期");
+  assert.equal(eraDate("10:00", eras), null);
+  // 两个数都不大于 12：年份在最后就是 日/月/年。
+  assert.deepEqual(eraDate("5\n3\n2022", eras), { era: "", year: 22, month: 3, day: 5, text: "22年3月5日" });
+  assert.equal(keywordsUseFullYears(["2022年3月"]), true);
+});
+
+test("四位数年份在前：年/月/日，大于 12 的一定是日", () => {
+  const { eraDate } = require("../game-bridge.js");
+  assert.deepEqual(eraDate("2021\n10\n27", [""]), { era: "", year: 21, month: 10, day: 27, text: "21年10月27日" });
+  assert.deepEqual(eraDate("2021\n27\n10", [""]), { era: "", year: 21, month: 10, day: 27, text: "21年10月27日" });
+  assert.equal(eraDate("2021\n13\n14", [""]), null, "两个都大于 12");
+});
+
+test("《六国论》年号在前的格式不受影响", () => {
+  const { keywordEras, eraDate } = require("../game-bridge.js");
+  const eras = keywordEras(["靖安成15年", "靖安成15年4月", "第1天"]);
+  assert.deepEqual(eraDate("靖安成\n15\n4", eras), { era: "靖安成", year: 15, month: 4, text: "靖安成15年4月" });
+  assert.deepEqual(eraDate("15\n1上旬", keywordEras(["15年1月"])), { era: "", year: 15, month: 1, text: "15年1月上旬" });
+});
