@@ -45,8 +45,9 @@
 #ogo-panel .ogo-status { padding: 9px 16px; color: #786d61; background: #f6f0e7; font-size: 12px; line-height: 1.55; }
 #ogo-panel main { flex: 1; overflow: auto; padding: 11px 12px; }
 #ogo-panel .ogo-card { margin-bottom: 10px; padding: 12px; border: 1px solid #e9dfd3; border-radius: 10px; background: white; }
-#ogo-panel .ogo-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-#ogo-panel .ogo-badge { padding: 4px 8px; border-radius: 99px; color: #704739; background: #f5e8dd; font-size: 11px; }
+#ogo-panel .ogo-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 6px 8px; }
+#ogo-panel .ogo-card-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; flex: 1 1 140px; }
+#ogo-panel .ogo-author { color: #4e4035; font-size: 12px; overflow-wrap: anywhere; }
 #ogo-panel .ogo-card-head button { border: 0; padding: 4px; color: #8a5a48; background: transparent; font-size: 11px; }
 #ogo-panel .ogo-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 7px; }
 #ogo-panel .ogo-card-head .ogo-fav { border: 1px solid #e8d8c7; border-radius: 99px; padding: 5px 8px; color: #805e47; background: #fffaf4; white-space: nowrap; }

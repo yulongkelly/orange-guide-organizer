@@ -14,7 +14,7 @@
 
   // Same fields as the single-card star button.
   function toFavorite(key, r, savedAt) {
-    return { key, text: r.text, author: r.author, flowerLine: r.flowerLine, postedAt: r.postedAt, topic: r.topic, likes: r.likes, flowers: r.flowers, url: r.url, workTitle: r.workTitle, savedAt };
+    return { key, text: r.text, author: r.author, flowerLine: r.flowerLine, postedAt: r.postedAt, topic: r.topic, likes: r.likes, flowers: r.flowers, flowersFresh: r.flowersFresh ?? null, flowersWild: r.flowersWild ?? null, url: r.url, workTitle: r.workTitle, savedAt };
   }
 
   // Returns a new favorites object plus the keys added; existing entries are never overwritten.

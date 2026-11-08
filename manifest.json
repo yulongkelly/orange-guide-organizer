@@ -15,6 +15,7 @@
       "js": [
         "time-points.js",
         "markdown.js",
+        "card-text.js",
         "bulk-favorite.js",
         "content.js"
       ],

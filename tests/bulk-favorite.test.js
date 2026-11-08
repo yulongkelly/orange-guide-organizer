@@ -23,8 +23,8 @@ test("pickUnsaved ignores inherited keys and handles empty input", () => {
 });
 
 test("toFavorite copies the same fields as the star button", () => {
-  const r = { text: "t", author: "a", flowerLine: "f", postedAt: "p", topic: "x", likes: 1, flowers: 2, url: "u", workTitle: "w", extra: 1 };
-  assert.deepEqual(toFavorite("k", r, 5), { key: "k", text: "t", author: "a", flowerLine: "f", postedAt: "p", topic: "x", likes: 1, flowers: 2, url: "u", workTitle: "w", savedAt: 5 });
+  const r = { text: "t", author: "a", flowerLine: "f", postedAt: "p", topic: "x", likes: 1, flowers: 2, flowersFresh: 1, flowersWild: 1, url: "u", workTitle: "w", extra: 1 };
+  assert.deepEqual(toFavorite("k", r, 5), { key: "k", text: "t", author: "a", flowerLine: "f", postedAt: "p", topic: "x", likes: 1, flowers: 2, flowersFresh: 1, flowersWild: 1, url: "u", workTitle: "w", savedAt: 5 });
 });
 
 test("mergeFavorites adds new entries without touching existing or the input", () => {
