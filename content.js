@@ -74,21 +74,19 @@
     const fromText = compact.match(/(?:点赞|赞)\s*[:：]?\s*(\d{1,7})/);
     return fromText ? Number(fromText[1]) : null;
   };
-  const getFlowerCount = (node) => {
-    // Comment headers may show two flower types or one type; a single count is equivalent to count + 0.
+  const cardApi = globalThis.OgoCardText;
+  const getFlowerParts = (node) => {
+    // Comment headers may show two flower types or one type; a single count is equivalent to fresh + 0.
     for (const el of node.querySelectorAll("span,div,a")) {
-      const label = clean(el.innerText || el.textContent);
-      const match = label.match(/^([^\d\n]{1,32}?)\s+(\d{1,6})\s+(\d{1,6})$/);
-      if (match) return Number(match[2]) + Number(match[3]);
+      const parts = cardApi.flowerPartsFromLabel(el.innerText || el.textContent);
+      if (parts) return parts;
     }
     const lines = String(node.innerText || node.textContent || "").replace(/\r/g, "").split("\n").map((line) => line.trim()).filter(Boolean);
-    for (let i = 1; i < Math.min(lines.length, 5); i++) {
-      const pair = lines[i].match(/^(\d{1,6})\s+(\d{1,6})$/);
-      if (pair) return Number(pair[1]) + Number(pair[2]);
-      if (/^\d{1,6}$/.test(lines[i])) return Number(lines[i]);
-      if (/\d{4}-\d{2}-\d{2}/.test(lines[i])) break;
-    }
-    return null;
+    return cardApi.flowerPartsFromLines(lines);
+  };
+  const getFlowerCount = (node) => {
+    const parts = getFlowerParts(node);
+    return parts ? parts.fresh + parts.wild : null;
   };
   const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const safeSourceUrl = (value) => {
@@ -136,9 +134,9 @@
     }
     const workHtml = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([title, entries]) => {
       const articles = entries.map((favorite) => {
-        const meta = [favorite.author, favorite.postedAt, favorite.likes == null ? "赞数未知" : `赞 ${favorite.likes}`, favorite.flowers == null ? "花数未知" : `🌸 ${favorite.flowers}`, ...(foldersForKey.get(favorite.key) || []).map((name) => `📁 ${name}`)].filter(Boolean).map(escapeHtml).join(" · ");
+        const meta = [favorite.author, favorite.postedAt, favorite.likes == null ? "赞数未知" : `赞 ${favorite.likes}`, cardApi.flowerLabel(favorite), ...(foldersForKey.get(favorite.key) || []).map((name) => `📁 ${name}`)].filter(Boolean).map(escapeHtml).join(" · ");
         const source = safeSourceUrl(favorite.url);
-        return `<article class="card"><div class="meta">${meta}</div><pre>${escapeHtml(favorite.text)}</pre>${source ? `<a href="${escapeHtml(source)}">打开原评论来源 ↗</a>` : ""}</article>`;
+        return `<article class="card"><div class="meta">${meta}</div><pre>${escapeHtml(cardApi.displayBody(favorite))}</pre>${source ? `<a href="${escapeHtml(source)}">打开原评论来源 ↗</a>` : ""}</article>`;
       }).join("");
       const source = safeSourceUrl(entries[0]?.url);
       return `<details><summary><strong>${escapeHtml(title)}</strong><span>${entries.length} 条收藏</span></summary>${source ? `<p><a href="${escapeHtml(source)}">打开作品页 ↗</a></p>` : ""}${articles}</details>`;
@@ -166,7 +164,7 @@
       if (seenKeys.has(favorite.key)) { repeatedKeys++; continue; }
       seenKeys.add(favorite.key);
       const numeric = (value) => value == null || (typeof value === "number" && Number.isFinite(value) && value >= 0);
-      if (!numeric(favorite.likes) || !numeric(favorite.flowers)) throw new Error("收藏条目的赞数或花数格式不正确。");
+      if (!numeric(favorite.likes) || !numeric(favorite.flowers) || !numeric(favorite.flowersFresh) || !numeric(favorite.flowersWild)) throw new Error("收藏条目的赞数或花数格式不正确。");
       favoritesInFile.push({
         key: favorite.key, text: favorite.text,
         author: typeof favorite.author === "string" ? favorite.author : "未知作者",
@@ -174,6 +172,7 @@
         postedAt: typeof favorite.postedAt === "string" ? favorite.postedAt : "",
         topic: typeof favorite.topic === "string" ? favorite.topic : "其他攻略",
         likes: favorite.likes ?? null, flowers: favorite.flowers ?? null,
+        flowersFresh: favorite.flowersFresh ?? null, flowersWild: favorite.flowersWild ?? null,
         url: safeSourceUrl(favorite.url),
         workTitle: typeof favorite.workTitle === "string" ? favorite.workTitle : `作品 ${String(favorite.url || "").match(/\/game\/(\d+)/)?.[1] || "未知"}`,
         savedAt: Number.isFinite(favorite.savedAt) ? favorite.savedAt : Date.now()
@@ -210,6 +209,21 @@
     }
     return blocks.length > 1 ? blocks.map((block) => block.trim()).filter(Boolean) : [value];
   };
+  // A container that holds several comments: find the outermost element inside it that holds only this block's comment.
+  const commentEnding = /分享(?:\s+\S{1,8}){0,6}?\s+举报[ \t]*(?=\n|$)/g;
+  // Blocks can start with the previous comment's hidden menu (拉黑 删除 精选…), so anchor on the posting date and the text after it.
+  const findBlockNode = (container, block) => {
+    const text = clean(block);
+    const date = text.search(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/);
+    const head = date >= 0 ? text.slice(date, date + 40) : text.slice(Math.floor(text.length / 2), Math.floor(text.length / 2) + 40);
+    if (!head) return container;
+    for (const el of container.querySelectorAll("*")) {
+      const raw = el.innerText || el.textContent || "";
+      if (!clean(raw).includes(head)) continue;
+      if ((raw.match(commentEnding) || []).length <= 1) return el;
+    }
+    return container;
+  };
   const findComments = () => {
     const nodes = [...document.querySelectorAll(selectors)];
     const seen = new Set();
@@ -236,7 +250,7 @@
       for (const block of blocks) {
         const scope = document.createElement("div");
         scope.textContent = block;
-        add(node, formatCommentText(block), block, scope);
+        add(findBlockNode(node, block), formatCommentText(block), block, scope);
       }
     }
     return found;
@@ -244,9 +258,13 @@
 
   const pageControlText = (el) => clean(el.getAttribute("aria-label") || el.getAttribute("title") || el.innerText || el.textContent);
   const isVisible = (el) => Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
-  const getPagination = () => {
-    const roots = [...document.querySelectorAll('[class*="pagination" i],[class*="pager" i],[id*="pagination" i],[id*="pager" i],nav')]
-      .filter((el) => !panel.contains(el) && isVisible(el))
+  const pagerSelector = '[class*="pagination" i],[class*="pager" i],[id*="pagination" i],[id*="pager" i],nav';
+  // The work page has several comment lists (推荐 / 精彩长评 / 全部评论), each with its own pager; a key names one of them.
+  // A record's `zone` is the key of the pager next to it ("" = the default pager the full scrape turns).
+  const pagerKeyOf = (el) => el.id ? `#${el.id}` : (typeof el.className === "string" ? clean(el.className) : "");
+  const getPagination = (zone) => {
+    const roots = [...document.querySelectorAll(pagerSelector)]
+      .filter((el) => !panel.contains(el) && isVisible(el) && (!zone || pagerKeyOf(el) === zone))
       .map((el) => ({ el, numbers: [...el.querySelectorAll('a,button,[role="button"],li')].filter((item) => isVisible(item) && /^\d{1,5}$/.test(clean(item.innerText || item.textContent))) }))
       .filter(({ numbers }) => numbers.length >= 2 && numbers.length <= 40)
       .sort((a, b) => a.numbers.length - b.numbers.length);
@@ -291,20 +309,44 @@
     return { root: root.el, current, total: Number.isFinite(total) ? total : null, numeric, next: (current == null ? null : numeric.get(current + 1)) || arrow("next"), previous: (current == null ? null : numeric.get(current - 1)) || arrow("previous") };
   };
 
-  const waitForPage = async (pageNumber, previousUrl) => {
+  // The nearest pager around a comment (searching outward from it) is the one that pages its list.
+  const pagerKeyForNode = (node) => {
+    for (let el = node?.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      const pager = [...el.querySelectorAll(pagerSelector)].find((p) => !panel.contains(p) && !p.contains(node) && isVisible(p));
+      if (pager) return getPagination(pagerKeyOf(pager)) ? pagerKeyOf(pager) : "";
+    }
+    return "";
+  };
+
+  const waitForPage = async (pageNumber, previousUrl, zone) => {
     const deadline = Date.now() + 12000;
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 150));
-      const pagination = getPagination();
+      const pagination = getPagination(zone);
       if (pagination?.current === pageNumber || (location.href !== previousUrl && pagination?.current != null)) return pagination;
     }
     return null;
   };
 
-  const recordsOnCurrentPage = () => findComments().map(({ node, text, raw, scope }, index) => {
-    const header = getHeader(raw, text);
-    return { node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(scope, raw), flowers: getFlowerCount(scope), key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle() };
-  });
+  const recordsOnCurrentPage = () => {
+    const pageByZone = new Map();
+    return findComments().map(({ node, text, raw, scope }, index) => {
+      const header = getHeader(raw, text);
+      const zone = pagerKeyForNode(node);
+      if (!pageByZone.has(zone)) pageByZone.set(zone, zone ? getPagination(zone)?.current ?? null : null);
+      const parts = getFlowerParts(scope);
+      return {
+        node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(scope, raw),
+        flowers: parts ? parts.fresh + parts.wild : null, flowersFresh: parts ? parts.fresh : null, flowersWild: parts ? parts.wild : null,
+        key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle(),
+        page: pageByZone.get(zone), zone, identity: `${header.author}|${header.postedAt}|${clean(text).slice(0, 40)}`
+      };
+    })
+      // A real comment shows a post date, a like count or flowers; text with none of them (e.g. the work's own
+      // introduction) is not a comment, and its "author" is just its first line.
+      .filter((r) => r.postedAt || r.likes != null || r.flowers != null)
+      .map((r, index) => ({ ...r, index }));
+  };
 
   const panel = document.createElement("aside");
   panel.id = "ogo-panel";
@@ -372,6 +414,9 @@
   let lastBulkKeys = null;
   let activeBulkCollected = null;
   let ignorePaginationMutationsUntil = 0;
+  let jumping = false;
+  // True after 抓取全部页: the collected list must not be replaced by the automatic single-page scan.
+  let bulkResultsActive = false;
   const status = panel.querySelector("[data-status]");
   const consentScreen = panel.querySelector("[data-consent]");
   const results = panel.querySelector("[data-results]");
@@ -623,7 +668,7 @@
     drawnLocate = locateSignature();
     syncKeywords();
     syncWatch();
-    const topicsFound =["全部", ...new Set(records.map((r) => r.topic)), "收藏", "定位"];
+    const topicsFound = ["全部", "收藏", "定位"];
     topicNav.innerHTML = topicsFound.map((topic) => `<button class="${topic === activeTopic ? "active" : ""}" data-topic="${escapeHtml(topic)}">${escapeHtml(topic)}${topic === "收藏" ? ` ${Object.keys(favorites).length}` : topic === "定位" && guides.length ? ` ${guides.length}` : ""}</button>`).join("");
     folderNav.hidden = activeTopic !== "收藏";
     folderNav.innerHTML = `<button class="${activeFolderId === null ? "active" : ""}" data-folder-filter="">全部收藏</button>` + Object.values(folders).map((folder) => {
@@ -647,7 +692,7 @@
       const selectedFolder = activeFolderId ? folders[activeFolderId] : null;
       const keys = selectedFolder ? selectedFolder.items || [] : Object.keys(favorites);
       items = keys.map((key) => favorites[key]).filter(Boolean).map((favorite) => ({ ...favorite, workTitle: getStoredWorkTitle(favorite), saved: true }));
-    } else items = records.filter((r) => activeTopic === "全部" || r.topic === activeTopic);
+    } else items = records.filter(() => activeTopic === "全部");
     if (query) items = items.filter((r) => r.text.toLowerCase().includes(query.toLowerCase()));
     if (flowerMin != null || flowerMax != null) items = items.filter((r) => r.flowers != null && (flowerMin == null || r.flowers >= flowerMin) && (flowerMax == null || r.flowers <= flowerMax));
     if (sortMode === "likes-desc") items = [...items].sort((a, b) => (b.likes ?? -1) - (a.likes ?? -1));
@@ -680,14 +725,19 @@
     const renderCard = (r) => {
       const key = r.key || makeKey(r.text);
       const isSaved = Boolean(favorites[key]);
-      const jumpButton = r.node?.isConnected
-        ? `<button data-jump="${r.index}">回到原评论 ↗</button>`
+      // Favorites jump through the live record with the same key; collected records can be re-found after paging.
+      const live = r.saved ? records.find((x) => x.key === key) : r;
+      const here = location.href.split("#")[0];
+      const canJump = Boolean(live && (live.node?.isConnected || (live.page != null && live.url === here)));
+      const jumpButton = canJump
+        ? `<button data-jump="${escapeHtml(key)}">回到原评论${!live.node?.isConnected && live.page != null ? `（第 ${live.page} 页）` : ""} ↗</button>`
         : `<a class="ogo-origin" href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">打开作品页 ↗</a>`;
       const likeLabel = r.likes == null ? "赞数未知" : `赞 ${r.likes}`;
-      const flowerLabel = r.flowers == null ? "花数未知" : `🌸 ${r.flowers}`;
+      const flowerLabel = cardApi.flowerLabel(r);
+      const metaLine = [`<strong>${escapeHtml(r.author || "未知作者")}</strong>`, r.postedAt ? escapeHtml(r.postedAt) : ""].filter(Boolean).join(" · ");
       const selectFavorite = r.saved && activeTopic === "收藏" ? `<label class="ogo-select"><input type="checkbox" data-select-fav="${escapeHtml(key)}" ${selectedFavorites.has(key) ? "checked" : ""}/>选入文件夹</label>` : "";
       const exportOneButton = isSaved ? `<button data-export-favorite="${escapeHtml(key)}">导出</button>` : "";
-      return `<article class="ogo-card"><div class="ogo-card-head"><span class="ogo-badge">${escapeHtml(r.topic || "已收藏")}</span><div class="ogo-actions">${selectFavorite}<span class="ogo-likes">${likeLabel} · ${flowerLabel}</span>${exportOneButton}<button data-locate-add="${escapeHtml(key)}" title="想要清晰的标题和分节，请导入 .md 文件。">加入定位</button>${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(r.text)}</p></article>`;
+      return `<article class="ogo-card"><div class="ogo-card-head"><div class="ogo-card-meta"><span class="ogo-author">${metaLine}</span><span class="ogo-likes">${likeLabel} · ${escapeHtml(flowerLabel)}</span></div><div class="ogo-actions">${selectFavorite}${exportOneButton}<button data-locate-add="${escapeHtml(key)}" title="想要清晰的标题和分节，请导入 .md 文件。">加入定位</button>${jumpButton}<button class="ogo-fav ${isSaved ? "saved" : ""}" data-fav="${escapeHtml(key)}">${isSaved ? "★ 已收藏" : "☆ 收藏"}</button></div></div><p>${escapeHtml(cardApi.displayBody(r))}</p></article>`;
     };
     if (workGroups) {
       results.innerHTML = [...workGroups.entries()].sort(([a], [b]) => a.localeCompare(b, "zh-CN")).map(([title, entries]) => {
@@ -718,7 +768,7 @@
   }
 
   function scan() {
-    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) return;
+    if (!consentGranted || bulkScanRunning || jumping || bulkResultsActive || Date.now() < ignorePaginationMutationsUntil) return;
     bulkStatusMessage = "";
     lastBulkKeys = null;
     records = recordsOnCurrentPage();
@@ -734,6 +784,25 @@
   }
 
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // Steps to a numbered page (directly when its link exists, otherwise one next/previous click at a time). Returns true on arrival.
+  async function goToPage(target, zone, shouldStop) {
+    for (let guard = 0; guard < 300; guard++) {
+      if (shouldStop?.()) return false;
+      const pager = getPagination(zone);
+      if (!pager || pager.current == null) return false;
+      if (pager.current === target) return true;
+      const direct = pager.numeric.get(target);
+      const step = target > pager.current ? 1 : -1;
+      const control = direct || (step > 0 ? pager.next : pager.previous);
+      if (!control) return false;
+      const oldUrl = location.href;
+      const expected = direct ? target : pager.current + step;
+      control.click();
+      if (!await waitForPage(expected, oldUrl, zone)) return false;
+      await pause(direct ? 450 : 300);
+    }
+    return false;
+  }
   const showCollectedBulkRecords = (collected) => {
     records = [...collected.values()].map((record, index) => ({ ...record, index }));
   };
@@ -748,7 +817,18 @@
     if (!consentGranted) return;
     const initialPager = getPagination();
     if (!initialPager?.current) {
-      bulkStatusMessage = "没识别到评论分页。请先展开评论区，确认页码分页已显示后重试。";
+      if (!initialPager) {
+        // No pager at all: a single-page comment section counts as page 1.
+        const onlyPage = recordsOnCurrentPage();
+        if (onlyPage.length) {
+          records = onlyPage.map((record, index) => ({ ...record, page: record.page ?? 1, index }));
+          bulkResultsActive = true;
+          lastBulkKeys = null;
+          clearTimeout(scanTimer);
+          ignorePaginationMutationsUntil = Date.now() + 1800;
+          bulkStatusMessage = `只有 1 页，已收集 ${records.length} 条攻略评论。`;
+        } else bulkStatusMessage = "还没找到评论，请先展开评论区再试。";
+      } else bulkStatusMessage = "没识别到当前评论页码。请先展开评论区，确认页码分页已显示后重试。";
       render();
       return;
     }
@@ -764,15 +844,9 @@
     const startingPage = current;
     try {
       // Start at page 1 even if the user launched the organizer from a later page.
-      while (current > 1 && !bulkStopRequested) {
-        const pager = getPagination();
-        if (!pager?.previous) throw new Error(`无法从第 ${current} 页返回上一页。`);
-        const oldUrl = location.href;
-        pager.previous.click();
-        const moved = await waitForPage(current - 1, oldUrl);
-        if (!moved) throw new Error("翻页后未检测到页码变化；该作品的分页可能不是页面内切换。请手动切到第 1 页后重试。");
-        current = moved.current;
-        await pause(500);
+      if (current > 1 && !bulkStopRequested) {
+        if (!await goToPage(1, "", () => bulkStopRequested) && !bulkStopRequested) throw new Error("翻页后未检测到页码变化；该作品的分页可能不是页面内切换。请手动切到第 1 页后重试。");
+        current = getPagination()?.current ?? 1;
       }
       while (!bulkStopRequested) {
         const pager = getPagination();
@@ -780,7 +854,8 @@
         if (current == null) throw new Error("无法识别当前评论页码，已停止抓取。");
         for (const record of recordsOnCurrentPage()) {
           const identity = `${record.author}|${record.flowerLine}|${record.postedAt}|${clean(record.text)}`;
-          if (!collected.has(identity)) collected.set(identity, record);
+          // A comment with its own pager keeps that pager's page; one without falls back to the pager this scrape turns.
+          if (!collected.has(identity)) collected.set(identity, record.zone ? record : { ...record, page: current, zone: "" });
         }
         showCollectedBulkRecords(collected);
         pagesRead++;
@@ -802,16 +877,7 @@
       if (!bulkStopRequested && current !== startingPage) {
         bulkStatusMessage = `已读取 ${pagesRead} 页，正在返回原来的第 ${startingPage} 页…`;
         render();
-        while (current > startingPage) {
-          const pager = getPagination();
-          if (!pager?.previous) break;
-          const oldUrl = location.href;
-          pager.previous.click();
-          const moved = await waitForPage(current - 1, oldUrl);
-          if (!moved) break;
-          current = moved.current;
-          await pause(300);
-        }
+        await goToPage(startingPage);
       }
       showCollectedBulkRecords(collected);
       bulkStatusMessage = bulkStopRequested
@@ -825,9 +891,49 @@
       bulkScanRunning = false;
       bulkStopRequested = false;
       activeBulkCollected = null;
+      bulkResultsActive = collected.size > 0;
+      lastBulkKeys = null;
       clearTimeout(scanTimer);
       ignorePaginationMutationsUntil = Date.now() + 1800;
       render();
+    }
+  }
+
+  const highlightNode = (node) => {
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    node.classList.add("ogo-highlight");
+    setTimeout(() => node.classList.remove("ogo-highlight"), 2200);
+  };
+  async function jumpToComment(record) {
+    if (!record) return;
+    if (record.node?.isConnected) { highlightNode(record.node); return; }
+    jumping = true;
+    clearTimeout(scanTimer);
+    try {
+      const pager = getPagination(record.zone);
+      const base = record.page ?? 1;
+      // New comments push older ones back, so also try the neighbouring pages.
+      const candidates = pager ? [base, base + 1, base - 1].filter((p) => p >= 1 && (!pager.total || p <= pager.total)) : [base];
+      for (const target of candidates) {
+        bulkStatusMessage = `正在翻到第 ${target} 页…`;
+        render();
+        if (pager && !await goToPage(target, record.zone)) continue;
+        await pause(500);
+        const found = recordsOnCurrentPage().find((r) => r.identity === record.identity);
+        if (found) {
+          record.node = found.node;
+          record.page = found.page ?? target;
+          bulkStatusMessage = "";
+          render();
+          highlightNode(found.node);
+          return;
+        }
+      }
+      bulkStatusMessage = "这条评论可能被删除或已经换到别的页了";
+      render();
+    } finally {
+      jumping = false;
+      ignorePaginationMutationsUntil = Date.now() + 3000;
     }
   }
 
@@ -849,7 +955,7 @@
       });
     }
     if (event.target.closest('[data-action="decline-consent"]')) { panel.classList.remove("open"); syncWatch(); }
-    if (event.target.closest('[data-action="scan"]')) scan();
+    if (event.target.closest('[data-action="scan"]')) { bulkResultsActive = false; scan(); }
     if (event.target.closest('[data-action="scan-all-pages"]')) await scanAllPages();
     const topicButton = event.target.closest("[data-topic]");
     if (topicButton) {
@@ -978,14 +1084,7 @@
       await applyBulkFavorites(bulkApi.removeKeys(favorites, keys), keys, `已撤销 ${keys.length} 条收藏`, null);
     }
     const jump = event.target.closest("[data-jump]");
-    if (jump) {
-      const record = records.find((r) => r.index === Number(jump.dataset.jump));
-      if (record?.node?.isConnected) {
-        record.node.scrollIntoView({ behavior: "smooth", block: "center" });
-        record.node.classList.add("ogo-highlight");
-        setTimeout(() => record.node?.classList.remove("ogo-highlight"), 2200);
-      }
-    }
+    if (jump && !jumping && !bulkScanRunning) await jumpToComment(records.find((r) => r.key === jump.dataset.jump));
   });
   panel.querySelector("[data-search]").addEventListener("input", (event) => { query = event.target.value; render(); });
   panel.querySelector("[data-sort]").addEventListener("change", (event) => { sortMode = event.target.value; render(); });
@@ -1256,7 +1355,7 @@
   window.addEventListener("message", acceptGameTimeMessage);
   setInterval(() => { if (activeTopic === "定位" && document.activeElement?.tagName !== "INPUT") render(); }, 60000);
   new MutationObserver(() => {
-    if (!consentGranted || bulkScanRunning || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
+    if (!consentGranted || bulkScanRunning || jumping || bulkResultsActive || Date.now() < ignorePaginationMutationsUntil) { clearTimeout(scanTimer); return; }
     clearTimeout(scanTimer);
     scanTimer = setTimeout(scan, 700);
   }).observe(document.body, { childList: true, subtree: true });
