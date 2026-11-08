@@ -327,7 +327,11 @@
         key: makeKey(text, raw), url: location.href.split("#")[0], workTitle: getWorkTitle(),
         page: pageByZone.get(zone), zone, identity: `${header.author}|${header.postedAt}|${clean(text).slice(0, 40)}`
       };
-    });
+    })
+      // A real comment shows a post date, a like count or flowers; text with none of them (e.g. the work's own
+      // introduction) is not a comment, and its "author" is just its first line.
+      .filter((r) => r.postedAt || r.likes != null || r.flowers != null)
+      .map((r, index) => ({ ...r, index }));
   };
 
   const panel = document.createElement("aside");
