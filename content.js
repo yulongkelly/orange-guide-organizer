@@ -836,7 +836,9 @@
         if (current == null) throw new Error("无法识别当前评论页码，已停止抓取。");
         for (const record of recordsOnCurrentPage()) {
           const identity = `${record.author}|${record.flowerLine}|${record.postedAt}|${clean(record.text)}`;
-          if (!collected.has(identity)) collected.set(identity, { ...record, page: record.page ?? current });
+          // Record the page of the pager this scrape is actually turning, and jump back with that same pager (zone ""),
+          // since several sections can share one container class and a zone lookup could pick a different pager.
+          if (!collected.has(identity)) collected.set(identity, { ...record, page: current, zone: "" });
         }
         showCollectedBulkRecords(collected);
         pagesRead++;
