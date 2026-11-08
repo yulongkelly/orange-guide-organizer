@@ -209,6 +209,21 @@
     }
     return blocks.length > 1 ? blocks.map((block) => block.trim()).filter(Boolean) : [value];
   };
+  // A container that holds several comments: find the outermost element inside it that holds only this block's comment.
+  const commentEnding = /分享(?:\s+\S{1,8}){0,6}?\s+举报[ \t]*(?=\n|$)/g;
+  // Blocks can start with the previous comment's hidden menu (拉黑 删除 精选…), so anchor on the posting date and the text after it.
+  const findBlockNode = (container, block) => {
+    const text = clean(block);
+    const date = text.search(/\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/);
+    const head = date >= 0 ? text.slice(date, date + 40) : text.slice(Math.floor(text.length / 2), Math.floor(text.length / 2) + 40);
+    if (!head) return container;
+    for (const el of container.querySelectorAll("*")) {
+      const raw = el.innerText || el.textContent || "";
+      if (!clean(raw).includes(head)) continue;
+      if ((raw.match(commentEnding) || []).length <= 1) return el;
+    }
+    return container;
+  };
   const findComments = () => {
     const nodes = [...document.querySelectorAll(selectors)];
     const seen = new Set();
@@ -235,7 +250,7 @@
       for (const block of blocks) {
         const scope = document.createElement("div");
         scope.textContent = block;
-        add(node, formatCommentText(block), block, scope);
+        add(findBlockNode(node, block), formatCommentText(block), block, scope);
       }
     }
     return found;
@@ -243,23 +258,13 @@
 
   const pageControlText = (el) => clean(el.getAttribute("aria-label") || el.getAttribute("title") || el.innerText || el.textContent);
   const isVisible = (el) => Boolean(el && el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
-  const ZONE_SELECTOR = '[class*="comment-wrap"],.commentZone';
-  // A record's zone is the class string of its comment container; turn it back into the container elements.
-  const zoneContainers = (zone) => {
-    const classes = String(zone || "").split(/\s+/).filter(Boolean);
-    if (!classes.length) return [];
-    try { return [...document.querySelectorAll("." + classes.map((c) => CSS.escape(c)).join("."))].filter((el) => !panel.contains(el)); } catch { return []; }
-  };
+  const pagerSelector = '[class*="pagination" i],[class*="pager" i],[id*="pagination" i],[id*="pager" i],nav';
+  // The work page has several comment lists (推荐 / 精彩长评 / 全部评论), each with its own pager; a key names one of them.
+  // A record's `zone` is the key of the pager next to it ("" = the default pager the full scrape turns).
+  const pagerKeyOf = (el) => el.id ? `#${el.id}` : (typeof el.className === "string" ? clean(el.className) : "");
   const getPagination = (zone) => {
-    const containers = zoneContainers(zone);
-    let candidates = [...document.querySelectorAll('[class*="pagination" i],[class*="pager" i],[id*="pagination" i],[id*="pager" i],nav')]
-      .filter((el) => !panel.contains(el) && isVisible(el));
-    // With a zone, prefer the pager inside that zone's container; fall back to the old choice when it has none.
-    if (containers.length) {
-      const inZone = candidates.filter((el) => containers.some((c) => c.contains(el)));
-      if (inZone.length) candidates = inZone;
-    }
-    const roots = candidates
+    const roots = [...document.querySelectorAll(pagerSelector)]
+      .filter((el) => !panel.contains(el) && isVisible(el) && (!zone || pagerKeyOf(el) === zone))
       .map((el) => ({ el, numbers: [...el.querySelectorAll('a,button,[role="button"],li')].filter((item) => isVisible(item) && /^\d{1,5}$/.test(clean(item.innerText || item.textContent))) }))
       .filter(({ numbers }) => numbers.length >= 2 && numbers.length <= 40)
       .sort((a, b) => a.numbers.length - b.numbers.length);
@@ -304,6 +309,15 @@
     return { root: root.el, current, total: Number.isFinite(total) ? total : null, numeric, next: (current == null ? null : numeric.get(current + 1)) || arrow("next"), previous: (current == null ? null : numeric.get(current - 1)) || arrow("previous") };
   };
 
+  // The nearest pager around a comment (searching outward from it) is the one that pages its list.
+  const pagerKeyForNode = (node) => {
+    for (let el = node?.parentElement; el && el !== document.documentElement; el = el.parentElement) {
+      const pager = [...el.querySelectorAll(pagerSelector)].find((p) => !panel.contains(p) && !p.contains(node) && isVisible(p));
+      if (pager) return getPagination(pagerKeyOf(pager)) ? pagerKeyOf(pager) : "";
+    }
+    return "";
+  };
+
   const waitForPage = async (pageNumber, previousUrl, zone) => {
     const deadline = Date.now() + 12000;
     while (Date.now() < deadline) {
@@ -318,8 +332,8 @@
     const pageByZone = new Map();
     return findComments().map(({ node, text, raw, scope }, index) => {
       const header = getHeader(raw, text);
-      const zone = node.closest?.(ZONE_SELECTOR)?.getAttribute("class") || "";
-      if (!pageByZone.has(zone)) pageByZone.set(zone, getPagination(zone)?.current ?? null);
+      const zone = pagerKeyForNode(node);
+      if (!pageByZone.has(zone)) pageByZone.set(zone, zone ? getPagination(zone)?.current ?? null : null);
       const parts = getFlowerParts(scope);
       return {
         node, text, raw, index, ...header, topic: getTopic(text), likes: getLikes(scope, raw),
@@ -716,7 +730,7 @@
       const here = location.href.split("#")[0];
       const canJump = Boolean(live && (live.node?.isConnected || (live.page != null && live.url === here)));
       const jumpButton = canJump
-        ? `<button data-jump="${escapeHtml(key)}">回到原评论 ↗</button>`
+        ? `<button data-jump="${escapeHtml(key)}">回到原评论${!live.node?.isConnected && live.page != null ? `（第 ${live.page} 页）` : ""} ↗</button>`
         : `<a class="ogo-origin" href="${escapeHtml(r.url || location.href)}" target="_blank" rel="noreferrer">打开作品页 ↗</a>`;
       const likeLabel = r.likes == null ? "赞数未知" : `赞 ${r.likes}`;
       const flowerLabel = cardApi.flowerLabel(r);
@@ -840,9 +854,8 @@
         if (current == null) throw new Error("无法识别当前评论页码，已停止抓取。");
         for (const record of recordsOnCurrentPage()) {
           const identity = `${record.author}|${record.flowerLine}|${record.postedAt}|${clean(record.text)}`;
-          // Record the page of the pager this scrape is actually turning, and jump back with that same pager (zone ""),
-          // since several sections can share one container class and a zone lookup could pick a different pager.
-          if (!collected.has(identity)) collected.set(identity, { ...record, page: current, zone: "" });
+          // A comment with its own pager keeps that pager's page; one without falls back to the pager this scrape turns.
+          if (!collected.has(identity)) collected.set(identity, record.zone ? record : { ...record, page: current, zone: "" });
         }
         showCollectedBulkRecords(collected);
         pagesRead++;
