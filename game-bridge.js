@@ -67,12 +67,39 @@
 
   // Pure: eras the guide's keywords count years in: 昭元30年 -> 昭元, 靖安成15年4月 -> 靖安成.
   // A keyword that starts with the year (15年1月) gives the empty era "", which is tried last.
+  // Pure: whether the guide writes four-digit years without an era (2022年3月) rather than two-digit ones (22年3月).
+  const keywordsUseFullYears = (keywords) => keywords.some((keyword) => /^(?:19|20)\d\d年/.test(keyword.split("!")[0]));
   const keywordEras = (keywords) => [...new Set(keywords.map((keyword) => keyword.split("!")[0].match(/^(\D*?)\d+年/)?.[1]).filter((era) => era != null))].sort((a, b) => b.length - a.length);
   // Pure: some games draw the era and the numbers as text but bake 年/月 into the background ("昭", "元", "30", "1", "辰").
   // An era from the guide followed by two separate numbers is read as that year and month, and the text right after is kept
   // (上旬, 辰): { era: "昭元", year: 30, month: 1, text: "昭元30年1月辰" }. Without an era ("15", "1", "上旬") the two numbers
   // must be the first numbers in the text, so other numbers on the same row are never read as a date.
-  const eraDate = (text, eras) => {
+  // Pure: a full date with a four-digit year (1900-2099) and no era, as some games draw it: "27 10 2021" (day/month/year) or
+  // "2021 10 27" (year/month/day). Of the other two numbers, one above 12 is the day; if neither is, the order decides.
+  // The year is cut to two digits (2021 -> 21) unless the guide writes four-digit years (fullYears).
+  const fullDate = (text, fullYears) => {
+    const match = text.match(/(\d{1,4})\s+(\d{1,2})\s+(\d{1,4})(?!\d)/);
+    if (!match || /\d/.test(text.slice(0, match.index))) return null;
+    const numbers = match.slice(1, 4).map(Number);
+    const isYear = (i) => match[i + 1].length === 4 && numbers[i] >= 1900 && numbers[i] <= 2099;
+    if (isYear(0) === isYear(2)) return null;
+    const yearLast = isYear(2);
+    const year = yearLast ? numbers[2] : numbers[0];
+    let [day, month] = yearLast ? [numbers[0], numbers[1]] : [numbers[2], numbers[1]];
+    if (month > 12 && day <= 12) [day, month] = [month, day];
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const shown = fullYears ? year : year % 100;
+    const after = text.slice(match.index + match[0].length).replace(/\s+/g, "").match(/^\D{0,6}/)[0];
+    return { era: "", year: shown, month, day, text: `${shown}年${month}月${day}日${after}` };
+  };
+  // Clock times (10:00) are never part of a date.
+  const CLOCK = /\d{1,2}\s*[:：]\s*\d{2}(?!\d)/g;
+  const eraDate = (raw, eras, { fullYears = false } = {}) => {
+    const text = String(raw).replace(CLOCK, " ");
+    if (eras.includes("")) {
+      const full = fullDate(text, fullYears);
+      if (full) return full;
+    }
     for (const era of eras) {
       const letters = [...era].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
       const match = String(text).match(new RegExp(`${letters}\\s*(\\d{1,3})\\s+(\\d{1,2})(?!\\d)`));
@@ -161,7 +188,7 @@
     return [...md5s];
   };
 
-  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, keywordEras, eraDate, globalPosition, topOf, readingOrder, md5FromUrl, collectVisibleImages }; return; }
+  if (typeof module !== "undefined" && module.exports) { module.exports = { inspectText, createRolling, matchPrefixedDate, headerDate, rememberIn, keywordEras, keywordsUseFullYears, eraDate, globalPosition, topOf, readingOrder, md5FromUrl, collectVisibleImages }; return; }
   if (window.__ogoGameBridge || window === window.top) return;
   window.__ogoGameBridge = true;
   const rolling = createRolling();
@@ -238,9 +265,10 @@
   // Eras come from the guide's keywords, so two numbers on screen are only read as a date for a guide that counts years that way.
   let eras = [];
   let erasFor = null;
+  let fullYears = false;
   const readEra = (text) => {
-    if (erasFor !== keywords) { erasFor = keywords; eras = keywordEras(keywords); }
-    return eras.length ? eraDate(text, eras) : null;
+    if (erasFor !== keywords) { erasFor = keywords; eras = keywordEras(keywords); fullYears = keywordsUseFullYears(keywords); }
+    return eras.length ? eraDate(text, eras, { fullYears }) : null;
   };
   const eraKeywords = (era) => (era ? matchKeywords(era.text) : []);
 
